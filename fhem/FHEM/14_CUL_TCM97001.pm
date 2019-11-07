@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-07-01 23:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-07 18:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -87,6 +87,8 @@ CUL_TCM97001_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         "$readingFnAttributes " .
                         "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
+                        "max-diff-rain:0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
+                        "windDirectionInverse:0,1 ".
                         "model:".join(",", sort keys %models);
 
   $hash->{AutoCreate}=
@@ -425,9 +427,10 @@ CUL_TCM97001_Parse($$)
   my $channel = undef;
   # für zusätzliche Sensoren
   #my @winddir_name=("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW");
-  my @winddir_name=("N","N","NE","E","SE","S","SW","W","NW");  #W132 Only these values were seen:0 (N), 45 (NE), 90 (E), 135 (SE), 180 (S), 225 (SW), 270 (W), 315 (NW).
+  my @winddir_name=("N","NE","E","SE","S","SW","W","NW","N");  #W132 Only these values were seen:0 (N), 45 (NE), 90 (E), 135 (SE), 180 (S), 225 (SW), 270 (W), 315 (NW).
   my $windSpeed = 0;
-  my $windDirection = 0  ;
+  my $windDirection = 0;
+  my $windDirectionDegree = 0;
   my $windDirectionText = "N";
   my $windgrad = 0  ;
   my $windGuest = 0;
@@ -913,12 +916,15 @@ CUL_TCM97001_Parse($$)
                   }
                   $diffRain = sprintf("%.1f", $diffRain);				
                   Log3 $hash, 4, "$iodev: CUL_TCM97001 $name old rain $oldRain, age $timeSinceLastUpdate, new rain $rain, diff rain $diffRain";
-                  my $maxDiffRain = $timeSinceLastUpdate / 60 + 1; 							# 1.0 Liter/Minute + 1.0 
-                  $maxDiffRain = sprintf("%.1f", $maxDiffRain + 0.05);						# round 0.1
-                  Log3 $hash, 4, "$iodev: CUL_TCM97001 $name max difference rain $maxDiffRain l";
-                  if ($diffRain > $maxDiffRain) {
-                     Log3 $hash, 3, "$iodev: CUL_TCM97001 $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
-                     return "";
+                  my $maxDiffRain = AttrVal($name, "max-diff-rain", 0);
+                  if ($maxDiffRain) {
+                     $maxDiffRain += $timeSinceLastUpdate / 60; 					# 1.0 Liter/Minute + maxDiffRain
+                     $maxDiffRain = sprintf("%.1f", $maxDiffRain + 0.05);						# round 0.1
+                     Log3 $hash, 4, "$iodev: CUL_TCM97001 $name max difference rain $maxDiffRain l";
+                     if ($diffRain > $maxDiffRain) {
+                        Log3 $hash, 3, "$iodev: CUL_TCM97001 $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
+                        return "";
+                     }
                   }
                }
             } else {
@@ -1019,7 +1025,7 @@ CUL_TCM97001_Parse($$)
           # *   D = Windspeed  (bitvalue * 0.2 m/s, correction for webapp = 3600/1000 * 0.2 * 100 = 72)
           # *   E = Checksum
           if ((hex($a[3])== 0x8) && (hex($a[4])== 0x0)&& (hex($a[5])== 0x0)) { # Windspeed
-              $windSpeed = (hex($aReverse[6]) + hex($aReverse[7])) * 0.2;
+              $windSpeed = (hex($aReverse[6]) + hex($aReverse[7]) * 16) * 0.2;
               $haswindspeed = TRUE;
               $model="W132";
               Log3 $hash,4, "$iodev: CUL_TCM97001_03:  $model  windSpeed: $windSpeed aR: $aReverse[6] $aReverse[7]";
@@ -1034,12 +1040,16 @@ CUL_TCM97001_Parse($$)
           # *   E = Windgust (bitvalue * 0.2 m/s, correction for webapp = 3600/1000 * 0.2 * 100 = 72)
           # *   F = Checksum 
             if ((hex($amsg[3])== 0xE)|| (hex($amsg[3])== 0xF)) { # Windguest
-              $windGuest = (hex($aReverse[6]) + hex($aReverse[7])) * 0.2;
-              $windDirection =  (hex($a[5]) >> 1) | (hex($a[4]) & 0x1);
+              $windGuest = (hex($aReverse[6]) + hex($aReverse[7]) * 16) * 0.2;
+              $windDirectionDegree = (hex($a[3]) & 0x1)+ ((hex($aReverse[4])*2) + (hex($aReverse[5]))*32);
+              if (AttrVal($name, "windDirectionInverse", 0)) {
+                 $windDirectionDegree = 360 - $windDirectionDegree;
+              }
+              $windDirection = int($windDirectionDegree/45); 
               $windDirectionText = $winddir_name[$windDirection];
               $haswind = TRUE;
               $model="W132";
-              Log3 $hash,4, "$iodev: CUL_TCM97001_04: $model windGuest: $windGuest aR: $aReverse[6] $aReverse[7]  winddir:$windDirection aR:$aReverse[4] $aReverse[5] txt:$windDirectionText";
+              Log3 $hash,4, "$iodev: CUL_TCM97001_04: $model windGuest: $windGuest aR: $aReverse[6] $aReverse[7] winddirDegree:$windDirectionDegree winddir:$windDirection:$windDirectionText";
             }
           # * Format for Rain
           # *   AAAAAAAA BBBB CCCC DDDD DDDD DDDD DDDD EEEE
@@ -1677,7 +1687,7 @@ CUL_TCM97001_Parse($$)
     if ($haswind == TRUE) {
           readingsBulkUpdate($def, "windGust", $windGuest );
           readingsBulkUpdate($def, "windDirection", $windDirection );
-          #readingsBulkUpdate($def, "windDirectionDegree", $windDirection * 360 / 16);     
+          readingsBulkUpdate($def, "windDirectionDegree", $windDirectionDegree );
           readingsBulkUpdate($def, "windDirectionText", $windDirectionText );
           $state = "Wg: $windGuest "." Wd: $windDirectionText ";
           $haswind = FALSE;
