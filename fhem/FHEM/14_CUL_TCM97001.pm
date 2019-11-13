@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-07 18:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-13 11:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -341,20 +341,24 @@ sub checkCRC_Type1 {
 }
 
 sub checkValues {
+  my $hash = shift;
+  my $model = shift;
   my $temp = shift;
   my $humidy = shift;
+  my $iodev = $hash->{NAME};
 
   if (!defined($temp)) {
     return FALSE;
   }
-  if (!defined($humidy)) {
-    $humidy = 50;
+  if ($temp > 60 || $temp < -30) {
+    Log3 $hash, 4, "$iodev: CUL_TCM97001 $model - ERROR temperature $temp";
+    return FALSE;
   }
-  if ($temp <= 60 && $temp >= -30
-      && $humidy >= 0 && $humidy <= 100) {
-    return TRUE;
+  if (defined($humidy) && ($humidy < 0 || $humidy > 100)) {
+    Log3 $hash, 4, "$iodev: CUL_TCM97001 $model - ERROR humidity $humidy";
+    return FALSE;
   }
-  return FALSE;
+  return TRUE;
 }
 
 ###################################
@@ -489,7 +493,7 @@ CUL_TCM97001_Parse($$)
 				}
 			}
 		}
-      if (checkValues($temp, 50)) {
+      if (checkValues($hash,"ABS700",$temp)) {
         $model="ABS700";
         $batbit = ((hex($a[4]) & 0x8) != 0x8);
         $mode = (hex($a[4]) & 0x4) >> 2;
@@ -512,7 +516,7 @@ CUL_TCM97001_Parse($$)
        	  $name = $def->{NAME};
       	} 
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hasbatcheck = TRUE;
@@ -535,7 +539,7 @@ CUL_TCM97001_Parse($$)
 
       $temp = $temp / 10;
 
-      if (checkValues($temp, 50)) {
+      if (checkValues($hash,"TCM97...",$temp)) {
       	$model="TCM97...";
          # I think bit 3 on byte 3 is battery warning
       	$batbit    = (hex($a[2]) >> 0) & 0x4; 
@@ -570,7 +574,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }        
         $packageOK = TRUE;
@@ -613,7 +617,7 @@ CUL_TCM97001_Parse($$)
 
         
 
-        if (checkValues($temp, 50)) {
+        if (checkValues($hash,"Mebus",$temp)) {
             $batbit = (hex($a[6]) & 0x2) >> 1;
             #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
             $mode   = (hex($a[6]) & 0x1);
@@ -639,7 +643,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             } 
             if(!$def) {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             $packageOK = TRUE;
@@ -701,7 +705,7 @@ CUL_TCM97001_Parse($$)
 		  $temp = $temp / 10;
 
 		  
-		  if (checkValues($temp, 50)) {
+		  if (checkValues($hash,"AURIOL",$temp)) {
 			$batbit = (hex($a[2]) & 0x8) >> 3;
 			$batbit = ~$batbit & 0x1; # Bat bit umdrehen
 			$mode   = (hex($a[2]) & 0x4) >> 2;
@@ -725,7 +729,7 @@ CUL_TCM97001_Parse($$)
 			} 
 					
 			if(!$def) {
-			  Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+			  Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
 			  return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
 			}
 
@@ -811,7 +815,7 @@ CUL_TCM97001_Parse($$)
 
       $humidity = hex($a[7].$a[8]) & 0x7F;
 
-      if (checkValues($temp, $humidity)) {
+      if (checkValues($hash,"Eurochron",$temp, $humidity)) {
         $batbit = (hex($a[2]) & 0x8) >> 3;
         #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode   = (hex($a[2]) & 0x4) >> 2;
@@ -833,7 +837,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }         
         if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         if (defined($humidity)) {
@@ -928,7 +932,7 @@ CUL_TCM97001_Parse($$)
                   }
                }
             } else {
-               Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+               Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             Log3 $hash,4, "$iodev: CUL_TCM97001 $name rain total: $rain l/qm";
@@ -1066,7 +1070,7 @@ CUL_TCM97001_Parse($$)
               Log3 $hash,4, "$iodev: CUL_TCM97001_05: $model rain: $rain ";
           }
         }
-    if ( checkValues($temp, $hashumidity) || $haswindspeed ||$haswind || $hasrain || $haschannel || $hasbatcheck ) {
+    if ( checkValues($hash,"W044|TCM21....",$temp, $humidity) || $haswindspeed ||$haswind || $hasrain || $haschannel || $hasbatcheck ) {
       my $deviceCode;
      	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
      	{	
@@ -1086,7 +1090,7 @@ CUL_TCM97001_Parse($$)
        	 $name = $def->{NAME};
       	} 
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001_08: Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001_08: Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
       $hasbatcheck = TRUE;
@@ -1132,7 +1136,7 @@ CUL_TCM97001_Parse($$)
         $humidity = 20;
       }
 
-      if (checkValues($temp, $humidity)) {
+      if (checkValues($hash,"GT_WT_02|Type1",$temp,$humidity)) {
         $channel = ((hex($a[2])) & 0x3) + 1;
         $batbit  = ((hex($a[2]) & 0x8) != 0x8);
         $mode    = (hex($a[2]) & 0x4) >> 2;
@@ -1157,7 +1161,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }         
         if(!$def) {
-            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hashumidity = TRUE;
@@ -1202,7 +1206,7 @@ CUL_TCM97001_Parse($$)
 
         
         
-        if (checkValues($temp, $humidity)) {
+        if (checkValues($hash, "Prologue", $temp, $humidity)) {
             $channel = (hex($a[3])) & 0x3;
             $batbit = (hex($a[3]) & 0x8) >> 3;
             $batbit = ~$batbit & 0x1; # Bat bit umdrehen
@@ -1225,7 +1229,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             }         
             if(!$def) {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             if (defined($humidity)) {
@@ -1271,7 +1275,7 @@ CUL_TCM97001_Parse($$)
       
       $humidity = hex($a[7].$a[8]) & 0x7F;
 
-      if (checkValues($temp, $humidity)) {
+      if (checkValues($hash, "NC_WS", $temp, $humidity)) {
      	$model="NC_WS";
      	$channel = (hex($a[3])) & 0x3;
      	$batbit = (hex($a[3]) & 0x8) >> 3;
@@ -1294,7 +1298,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
         $hashumidity = TRUE;
@@ -1329,7 +1333,7 @@ CUL_TCM97001_Parse($$)
       }
       $temp = $temp / 10;
 
-      if (checkValues($temp, 50)) {
+      if (checkValues($hash,"Rubicson",$temp)) {
         $model="Rubicson";
         
         if ($deviceCode ne $idType1)  # new naming convention
@@ -1348,7 +1352,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1393,7 +1397,7 @@ CUL_TCM97001_Parse($$)
       $rainMM = $rainticks / 25 * .5; # rain height in mm/qm, verified against sensor receiver display
       Log3 $name, 5, "$iodev: CUL_TCM97001 PFR_130 rain mm=$rainMM";
       
-      if (checkValues($temp, 50)) {
+      if (checkValues($hash,"PFR_130",$temp)) {
         $batbit = (hex($a[2]) & 0x8) >> 3; # in auriol_protocol_v20.pdf bat bit is n2 & 0x08, same
         $batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode   = (hex($a[2]) & 0x4) >> 2; # in auriol_protocol_v20.pdf mode is: n2 & 0x01, different
@@ -1423,7 +1427,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . $pfrId . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1464,7 +1468,7 @@ CUL_TCM97001_Parse($$)
       }
       $temp = $temp / 10;
 
-      if (checkValues($temp, 50)) {
+      if (checkValues($hash,"AURIOL",$temp)) {
         $batbit = (hex($a[2]) & 0x8) >> 3;
         $batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode   = (hex($a[2]) & 0x4) >> 2;
@@ -1492,7 +1496,7 @@ CUL_TCM97001_Parse($$)
       	} 
       	      	
         if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
         }
 
@@ -1556,7 +1560,7 @@ CUL_TCM97001_Parse($$)
         $humidity = hex($aReverse[7].$aReverse[6]) - 156;
         
 		### edited by @HomeAutoUser				
-		if (checkValues($temp, $humidity) == 1) {				# unplausibel Werte sonst teilweise
+		if (checkValues($hash,"KW9010",$temp, $humidity)) {				# unplausibel Werte sonst teilweise
 
             Log3 $hash, 5 , "$iodev: KW9010 values are matching";
             
@@ -1583,7 +1587,7 @@ CUL_TCM97001_Parse($$)
               $name = $def->{NAME};
             }         
             if(!$def) {
-                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode, please define it";
+                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
             $hashumidity = TRUE;    
@@ -1594,8 +1598,6 @@ CUL_TCM97001_Parse($$)
             
             $readedModel=$model;
         } else {
-       		Log3 $hash, 5 , "$iodev: KW9010 t:$temp / h:$humidity mismatch";
-       		
             $name = "Unknown";
         }
     } 
@@ -1773,7 +1775,7 @@ CUL_TCM97001_Parse($$)
     my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
     
     if (!$defUnknown) {
-      Log3 "Unknown", 2, "$iodev: CUL_TCM97001 Unknown device Unknown, please define it";
+      Log3 $iodev, 2, "$iodev: CUL_TCM97001 Unknown device Unknown msg:s$msg, please define it";
       return "UNDEFINED Unknown CUL_TCM97001 CUL_TCM97001_Unknown"; 
     } 
     $name = $defUnknown->{NAME};
