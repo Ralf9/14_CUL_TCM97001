@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-13 11:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-14 22:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -59,11 +59,13 @@ my %models = (
     "TCM97..."    => 'TCM97...',
     "ABS700"      => 'ABS700',
     "TCM21...."   => 'TCM21....',
+    "TCM218943"   => 'TCM218943',
     "Prologue"    => 'Prologue',
     "Rubicson"    => 'Rubicson',
     "NC_WS"       => 'NC_WS',
     "GT_WT_02"    => 'GT_WT_02',
     "AURIOL"      => 'AURIOL',
+    "Auriol_IAN"  => 'Auriol_IAN',
     "PFR_130"      => 'PFR_130',
     "Type1"       => 'Type1',
     "Mebus"       => 'Mebus',
@@ -101,11 +103,13 @@ CUL_TCM97001_Initialize($)
             "ABS700.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "Eurochron.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "TCM21....*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
+            "TCM218943.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "TCM97..._.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "GT_WT_02.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "Type1.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "Rubicson.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},    
             "AURIOL.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
+            "Auriol_IAN.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "PFR_130.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "KW9010.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},      
             "TCM97001.*" => {  ATTR => "event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:340"},
@@ -772,7 +776,7 @@ CUL_TCM97001_Parse($$)
     $readedModel = AttrVal($name, "model", "Unknown");
     Log3 $name, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
     
-    if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown") && $syncBit[1] < 5000)) {
+    if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown" && $hash->{TYPE} ne "SIGNALduino") && $syncBit[1] < 5000)) {
       # EAS 800 
       # G is every time 1111
       #
@@ -1342,7 +1346,7 @@ CUL_TCM97001_Parse($$)
           	{
 	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
-	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+	             $deviceCode="CUL_TCM97001_" . $model;
            	}
      	}     
       
@@ -1600,14 +1604,142 @@ CUL_TCM97001_Parse($$)
         } else {
             $name = "Unknown";
         }
-    } 
-     
+    }
+
+    if ($readedModel eq "Auriol_IAN" || (hex($a[9]) >= 1 && hex($a[9] <= 3 && $readedModel eq "Unknown"))) {
+        # Auriol Message Format (rflink/Plugin_044.c):
+        # 0    4    8    12   16   20   24   28   32   36
+        # 1011 1111 1001 1010 0110 0001 1011 0100 1001 0001
+        # B    F    9    A    6    1    B    4    9    1
+        # iiii iiii ???? sbTT tttt tttt tttt hhhh hhhh ??cc
+        # i = ID
+        # ? = unknown (0-15 check?)
+        # s = sendmode (1=manual, 0=auto)
+        # b = possibly battery indicator (1=low, 0=ok)
+        # T = temperature trend (2 bits) indicating temp equal/up/down
+        # t = Temperature => 0x61b  (0x61b-0x4c4)=0x157 *5)=0x6b3 /9)=0xBE => 0xBE = 190 decimal!
+        # h = humidity (4x10+9=49%)
+        # ? = unknown (always 00?)
+        # c = channel: 1 (2 bits)
+
+      $temp = round(((hex($a[4].$a[5].$a[6]) - 1220) * 5 / 90.0), 1);
+      if (hex($a[7]) < 10 && hex($a[8]) < 10) {
+        $humidity = $a[7] * 10 + $a[8];
+      }
+      else {
+        $humidity = 101;	# ungueltige humidity
+      }
+
+      if (checkValues($hash,"Auriol_IAN", $temp, $humidity)) {
+        $batbit = (hex($a[3]) & 0x4) >> 2;
+        $batbit = ~$batbit & 0x1; # Bat bit umdrehen
+        $mode = (hex($a[3]) & 0x8) >> 3;
+        $trend = hex($a[3]) & 0x3;
+        $channel = (hex($a[10])) & 0x3;
+
+        $model="Auriol_IAN";
+
+        if ($deviceCode ne $idType1)  # new naming convention
+        {
+           if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+           {
+              Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+           } else {
+              $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+           }
+        }
+
+        $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+        if($def) {
+          $name = $def->{NAME};
+        }
+        if(!$def) {
+            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
+        }
+        #if ($humidity >= 20) {
+        $hashumidity = TRUE;
+        #}
+        $hasbatcheck = TRUE;
+        $haschannel = FALSE;
+        $hasmode = TRUE;
+        $hastrend = TRUE;
+        $packageOK = TRUE;
+
+        $readedModel=$model;
+      } else {
+        $name = "Unknown";
+      }
+    }
+
+    if (($readedModel eq "TCM218943" || $readedModel eq "Unknown")) {
+        #    87FFDE0AD0EB
+        # 1000 0111 1111 1111 1101 1110 0000 1010 1101 0000 1110 1011
+        #    A    B    C    D    E    F    G    H    I
+        #
+        # Binärwerte sind invertiert!
+        # A+B = Zufällige Code wechelt beim Batteriewechsel
+        # C Bit 3 Battery, 0 Manual,
+        # E+F Hum - bit 0-7
+        # G+H+I Hum - Temperatur, wenn es negativ wird muss man negieren und dann 1 addieren
+
+      $temp    = (hex($a[6].$a[7].$a[8])) & 0x3FF;
+      $temp = (~$temp & 0x03FF);
+
+      my $negative    = (~hex($a[6])) & 0xC;
+      if ($negative == 0xC) {
+        $temp = (~$temp & 0x03FF) + 1;
+        $temp = -$temp;
+      }
+      $temp = $temp / 10;
+
+      $humidity = hex($a[4].$a[5]);
+      $humidity = (~$humidity & 0xFF);
+
+      if (checkValues($hash,"TCM218943", $temp, $humidity)) {
+        $batbit = (hex($a[2]) & 0x8) >> 3;
+        $mode    = hex($a[2]) & 0x1;
+        $mode    = (~$mode & 0x1);
+
+        $model="TCM218943";
+
+        if ($deviceCode ne $idType1)  # new naming convention
+        {
+           if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+           {
+              Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+           } else {
+              $deviceCode="CUL_TCM97001_" . $model;
+           }
+        }
+
+        $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+        if($def) {
+          $name = $def->{NAME};
+        }
+        if(!$def) {
+            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+            return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
+        }
+        if ($humidity >= 20) {
+          $hashumidity = TRUE;
+        }
+        $hasbatcheck = TRUE;
+        $haschannel = FALSE;
+        $hasmode = TRUE;
+        $packageOK = TRUE;
+
+        $readedModel=$model;
+      } else {
+        $name = "Unknown";
+      }
+    }
   }
   
   	# Ignoriere dieses Gerät. Das Gerät wird keine FileLogs/notifys triggern, empfangene Befehle
 	# werden stillschweigend ignoriert. Das Gerät wird weder in der Device-List angezeigt,
 	# noch wird es in Befehlen mit "Wildcard"-Namenspezifikation (siehe devspec) erscheinen.
-	return "" if(IsIgnored($name));	# wenn Attribut "ignore" gesetzt ist, werden alle Ausgaben ignoriert																								 
+	return "" if(IsIgnored($name));	# wenn Attribut "ignore" gesetzt ist, werden alle Ausgaben ignoriert
   
   if ($packageOK == TRUE) {
     # save lastT, calc rainMM sum for day and hour
@@ -1709,11 +1841,10 @@ CUL_TCM97001_Parse($$)
       $logtext .= " H: $valH";
     }
     if($hastrend) {
-      my $readTrend = ReadingsVal($name, "trend", "unknown");
-      if ($trend == 1) {
-        if ($readTrend ne  "falling") { readingsBulkUpdate($def, "trend", "falling"); }
-      } else {
-        if ($readTrend ne  "rising") { readingsBulkUpdate($def, "trend", "rising"); }
+      my $readTrend = ReadingsVal($name, "trend", "undef");
+      $trend = ('consistent', 'falling', 'rising', 'unknown')[$trend];
+      if ($readTrend ne $trend) {
+        readingsBulkUpdate($def, "trend", $trend);
       }
     }
     if ($hasbatcheck) {
