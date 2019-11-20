@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-14 22:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-20 22:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -433,7 +433,7 @@ CUL_TCM97001_Parse($$)
   my $temp = undef;
   my $humidity=undef;  
   my $channel = undef;
-  # für zusätzliche Sensoren
+  # fuer zusaetzliche Sensoren
   #my @winddir_name=("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW");
   my @winddir_name=("N","NE","E","SE","S","SW","W","NW","N");  #W132 Only these values were seen:0 (N), 45 (NE), 90 (E), 135 (SE), 180 (S), 225 (SW), 270 (W), 315 (NW).
   my $windSpeed = 0;
@@ -1116,7 +1116,7 @@ CUL_TCM97001_Parse($$)
 		#    F    F    0    0    F    9    5    5    F   
         # 1111 1111 0000 0000 1111 1001 0101 0101 1111 
         #    A    B    C    D    E    F    G    H    I 
-        # A+B = Zufällige Code wechelt beim Batteriewechsel
+        # A+B = Zufaellige Code wechelt beim Batteriewechsel
         # C Bit 4 Battery, 3 Manual, 2+1 Channel
         # D+E+F Temperatur, wenn es negativ wird muss man negieren und dann 1 addieren, wie im ersten Post beschrieben.
         # G+H Hum - bit 0-7 
@@ -1486,7 +1486,7 @@ CUL_TCM97001_Parse($$)
 		  	if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
 	             $deviceCode="CUL_TCM97001_".$idType1;
-	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model, deviceCode: $deviceCode";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
@@ -1677,8 +1677,8 @@ CUL_TCM97001_Parse($$)
         # 1000 0111 1111 1111 1101 1110 0000 1010 1101 0000 1110 1011
         #    A    B    C    D    E    F    G    H    I
         #
-        # Binärwerte sind invertiert!
-        # A+B = Zufällige Code wechelt beim Batteriewechsel
+        # Binaerwerte sind invertiert!
+        # A+B = Zufaellige Code wechelt beim Batteriewechsel
         # C Bit 3 Battery, 0 Manual,
         # E+F Hum - bit 0-7
         # G+H+I Hum - Temperatur, wenn es negativ wird muss man negieren und dann 1 addieren
@@ -1736,8 +1736,8 @@ CUL_TCM97001_Parse($$)
     }
   }
   
-  	# Ignoriere dieses Gerät. Das Gerät wird keine FileLogs/notifys triggern, empfangene Befehle
-	# werden stillschweigend ignoriert. Das Gerät wird weder in der Device-List angezeigt,
+  	# Ignoriere dieses Geraet. Das Geraet wird keine FileLogs/notifys triggern, empfangene Befehle
+	# werden stillschweigend ignoriert. Das Geraet wird weder in der Device-List angezeigt,
 	# noch wird es in Befehlen mit "Wildcard"-Namenspezifikation (siehe devspec) erscheinen.
 	return "" if(IsIgnored($name));	# wenn Attribut "ignore" gesetzt ist, werden alle Ausgaben ignoriert
   
@@ -1804,7 +1804,7 @@ CUL_TCM97001_Parse($$)
       $state="$state RainH: $rainSumHour RainD: $rainSumDay R: $rainticks Rmm: $rainMM";
       Log3 $name, 5, "$iodev: CUL_TCM97001 $name $id3 state: $state"; 
    }
-      #zusätzlich Daten für Wetterstation
+      #zusaetzlich Daten fuer Wetterstation
     if ($hasrain == TRUE) {
          ### inserted by elektron-bbs
          #my $rain_old = ReadingsVal($name, "rain", "unknown");
@@ -1962,14 +1962,16 @@ CUL_TCM97001_Parse($$)
   <ul>
     <li>ABS700</li>
     <li>AURIOL</li>
+    <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
     <li>Eurochron</li>
-	<li>GT_WT_02</li>
+    <li>GT_WT_02</li>
     <li>KW9010</li>
-	<li>NC_WS</li>
-	<li>TCM21....</li>
+    <li>NC_WS</li>
+    <li>TCM21....</li>
+    <li>TCM218943</li>
     <li>TCM97...</li>
-	<li>PFR-130 (rain)</li>
-	<li>Prologue</li>
+    <li>PFR-130 (rain)</li>
+    <li>Prologue</li>
     <li>Rubicson</li>
     <li>Ventus W155(Auriol): W044(temp/hum) W132(wind) W174(rain)</li>
     </ul>
@@ -1991,8 +1993,8 @@ CUL_TCM97001_Parse($$)
    <li>battery: The battery state: low or ok (if available)</li>
    <li>channel: The Channelnumber (if available)</li>
    <li>trend: The temperature trend (if available)</li>
-	 <li>israining: Statement rain between two measurements (if available)</li>
-	 <li>rain: The rain value, a consecutive number until the battery is changed (if available)</li>
+   <li>israining: Statement rain between two measurements (if available)</li>
+   <li>rain: The rain value, a consecutive number until the battery is changed (if available)</li>
    <li>winddir: The current wind direction</li>
    <li>windgrad: The current wind direction in degrees</li>
    <li>windspeed: The current wind speed</li>
@@ -2009,10 +2011,14 @@ CUL_TCM97001_Parse($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (ABS700, AURIOL, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM97…, Unknown, W044, W132, W174)</li>
-    <li>max-deviation-temp: (default:1, allowed values: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)</li>																			
+    <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
+    <li>max-deviation-temp: (default:1, allowed values: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)<br>
+       Maximum permissible deviation of the measured temperature from the previous value in Kelvin.</li>
+    <li>max-diff-rain: Default:0 (deactive)<br>
+       Maximum permissible deviation of the rainfall to the previous value in l/qm.</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>windDirectionInverse: If the anemometer has been mounted upside down, the wind direction can be turned around</li>
   </ul>
 
 
@@ -2025,20 +2031,22 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  Das CUL_TCM97001 Module verarbeitet von einem IO Gerät (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
+  Das CUL_TCM97001 Module verarbeitet von einem IO Ger&auml;t (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
   <br>
-  <b>Unterstütze Modelle:</b>
+  <b>Unterst&uuml;tzte Modelle:</b>
   <ul>
     <li>ABS700</li>
     <li>AURIOL</li>
+    <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
     <li>Eurochron</li>
-	<li>GT_WT_02</li>
+    <li>GT_WT_02</li>
     <li>KW9010</li>
-	<li>NC_WS</li>
-	<li>TCM21....</li>
+    <li>NC_WS</li>
+    <li>TCM21....</li>
+    <li>TCM218943</li>
     <li>TCM97...</li>
-	<li>PFR-130 (rain)</li>
-	<li>Prologue</li>
+    <li>PFR-130 (rain)</li>
+    <li>Prologue</li>
     <li>Rubicson</li>
     <li>Ventus W155(Auriol): W044(temp/hum) W132(wind) W174(rain)</li>
       </ul>
@@ -2056,12 +2064,12 @@ CUL_TCM97001_Parse($$)
   <b>Generierte Events:</b>
   <ul>
    <li>temperature: Die aktuelle Temperatur</li>
-   <li>humidity: Die aktuelle Luftfeutigkeit (falls verfügbar)</li>
-   <li>battery: Der Batteriestatus: low oder ok (falls verfügbar)</li>
-   <li>channel: Kanalnummer (falls verfügbar)</li>
-   <li>trend: Der Temperaturtrend (falls verfügbar)</li>
-	 <li>israining: Aussage Regen zwichen zwei Messungen (falls verfügbar)</li>
-	 <li>rain: Der Regenwert, eine fortlaufende Zahl bis zum Batteriewechsel (falls verfügbar)</li>
+   <li>humidity: Die aktuelle Luftfeutigkeit (falls verf&uuml;gbar)</li>
+   <li>battery: Der Batteriestatus: low oder ok (falls verf&uuml;gbar)</li>
+   <li>channel: Kanalnummer (falls verf&uuml;gbar)</li>
+   <li>trend: Der Temperaturtrend (falls verf&uuml;gbar)</li>
+   <li>israining: Aussage Regen zwichen zwei Messungen (falls verf&uuml;gbar)</li>
+   <li>rain: Der Regenwert, eine fortlaufende Zahl bis zum Batteriewechsel (falls verf&uuml;gbar)</li>
    <li>winddir: Die aktuelle Windrichtung</li>
    <li>windgrad: Die aktuelle Windrichtung in Grad</li>
    <li>windspeed: Die aktuelle Windgeschwindigkeit</li>
@@ -2076,11 +2084,14 @@ CUL_TCM97001_Parse($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (ABS700, AURIOL, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM97…, Unknown, W044, W132, W174)</li>
+    <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
     <li>max-deviation-temp: (Default:1, erlaubte Werte: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)<br>
-		Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.<br></li>																										 																										 
+         Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.</li>
+    <li>max-diff-rain: Default:0 (deaktiviert)<br>
+         Maximal erlaubte Abweichung der Regenmenge zum vorhergehenden Wert in l/qm.</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>windDirectionInverse: Wenn der Windmesser auf dem Kopf montiert wurde, kann damit die Windrichtung herumgedreht werden.</li>
   </ul>
 
 
