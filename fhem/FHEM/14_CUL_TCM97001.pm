@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-20 22:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-25 20:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -90,6 +90,7 @@ CUL_TCM97001_Initialize($)
                         "$readingFnAttributes " .
                         "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
                         "max-diff-rain:0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
+                        "negation-batt:0,1 ".
                         "windDirectionInverse:0,1 ".
                         "model:".join(",", sort keys %models);
 
@@ -155,24 +156,21 @@ CUL_TCM97001_Undef($$)
 # Checksum for Rain Gauge VENTUS W174 Protocol Auriol
 # n8 = ( 0x7 + n0 + n1 + n2 + n3 + n4 + n5 + n6 + n7 ) & 0xf
 sub checksum_W174 {
+  my $hash = shift;
   my $msg = shift;
-  Log3 "CUL_TCM97001 ", 4 , "CUL_TCM97001 W174 checksum calc for: $msg";
-  my @a = split("", $msg);
-  my $bitReverse = "";
-  my $x = undef;
-  foreach $x (@a) {
-     my $bin3=sprintf("%04b",hex($x));
-    $bitReverse = $bitReverse . reverse($bin3); 
+  my @decReverse = ();
+  my $binrev;
+  foreach my $x (split('', $msg)) {
+    $binrev = reverse(sprintf("%04b",hex($x)));
+    push (@decReverse, oct("0b".$binrev));
   }
-  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-  my @aReverse = split("", $hexReverse);                      # Split reversed a again
-  my $CRC = (7 + hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])+hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-  if ($CRC == hex($aReverse[8])) {
-      Log3 "CUL_TCM97001 ", 4 , "CUL_TCM97001 W174 checksum ok $CRC == ".hex($aReverse[8]);
-      return TRUE;
-  } else {
-      return FALSE;
+  my $CRC = (7 + $decReverse[0]+$decReverse[1]+$decReverse[2]+$decReverse[3]+$decReverse[4]+$decReverse[5]+$decReverse[6]+$decReverse[7]) & 15;
+  if ($CRC == $decReverse[8]) {
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 W174 checksum ok, calc CRC = ref CRC = $CRC";
+    return TRUE;
   }
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 W174 ERROR, checksum not ok!, calc CRC = $CRC, ref CRC = $decReverse[8]";
+  return FALSE;
 }
 
 
@@ -180,70 +178,68 @@ sub checksum_W174 {
 # Checksum for Temp/Hum/Wind  Ventus W132/W0044 Protocol Auriol
 # n8 = ( 0xf - n0 - n1 - n2 - n3 - n4 - n5 - n6 - n7 ) & 0xf
 sub checksum_W155 {
+  my $hash = shift;
   my $msg = shift;
-  Log3 "CUL_TCM97001 ", 5 , "CUL_TCM97001 W155 checksum calc for: $msg";
-  my @a = split("", $msg);
-  my $bitReverse = "";
-  my $x = undef;
-  foreach $x (@a) {
-     my $bin3=sprintf("%04b",hex($x));
-    $bitReverse = $bitReverse . reverse($bin3); 
+  my @decReverse = ();
+  my $binrev;
+  foreach my $x (split('', $msg)) {
+    $binrev = reverse(sprintf("%04b",hex($x)));
+    push (@decReverse, oct("0b".$binrev));
   }
-  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-  my @aReverse = split("", $hexReverse);                      # Split reversed a again
-  my $CRC = (0xF - hex($aReverse[0])- hex($aReverse[1]) - hex($aReverse[2]) - hex($aReverse[3]) - hex($aReverse[4]) - hex($aReverse[5]) - hex($aReverse[6]) - hex($aReverse[7])) & 0xF;
-  if ($CRC == hex($aReverse[8])) {
-      Log3 "CUL_TCM97001 ", 5 , "CUL_TCM97001 W155 checksum ok $CRC == ".hex($aReverse[8]);
-      return TRUE;
-  } else {
-      return FALSE;
+  my $CRC = (15 - $decReverse[0] - $decReverse[1] - $decReverse[2] - $decReverse[3] - $decReverse[4] - $decReverse[5] - $decReverse[6] - $decReverse[7]) & 15;
+  if ($CRC == $decReverse[8]) {
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 W155 checksum ok, calc CRC = ref CRC = $CRC";
+    return TRUE;
   }
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 W155 ERROR, checksum not ok!, calc CRC = $CRC, ref CRC = $decReverse[8]";
+  return FALSE;
 }
-
 
 #
 # CRC Check for TCM 21....
 #
-sub checkCRC {
-  my $msg = shift;
-  my @a = split("", $msg);
-  my $bitReverse = "";
-  my $x = undef;
-  foreach $x (@a) {
-     my $bin3=sprintf("%04b",hex($x));
-    $bitReverse = $bitReverse . reverse($bin3); 
-  }
-  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
+#sub checkCRC {
+#  my $msg = shift;
+#  my @a = split("", $msg);
+#  my $bitReverse = "";
+#  my $x = undef;
+#  foreach $x (@a) {
+#     my $bin3=sprintf("%04b",hex($x));
+#    $bitReverse = $bitReverse . reverse($bin3); 
+#  }
+#  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
 
   #Split reversed a again
-  my @aReverse = split("", $hexReverse);
+#  my @aReverse = split("", $hexReverse);
 
-  my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
-            +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-  if ($CRC + hex($aReverse[8]) == 15) {
-      return TRUE;
-  }
-  return FALSE;
-}
+#  my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
+#            +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
+#  if ($CRC + hex($aReverse[8]) == 15) {
+#      return TRUE;
+#  }
+#  return FALSE;
+#}
+
 #
 # CRC 4 check for PFR-130
 # xor 4 bits of nibble 0 to 7
 #
 sub checkCRC4 {
+  my $hash = shift;
   my $msg = shift;
   my @a = split("", $msg);
   if(scalar(@a)<9){
-    Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 failed for msg=($msg) length<9";
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 PFR_130 checkCRC4 failed for msg=($msg) length<9";
     return FALSE;
   }
   # xor nibbles 0 to 7 and compare to n8, if more nibble they might have been added to fill gap
   my $CRC = ( (hex($a[0])) ^ (hex($a[1])) ^ (hex($a[2])) ^ (hex($a[3])) ^ 
              (hex($a[4])) ^ (hex($a[5])) ^ (hex($a[6])) ^ (hex($a[7])) );
   if ($CRC ==  (hex($a[8]))) {
-    Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 OK for msg=($msg)";
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 PFR_130 checksum ok, calc CRC = ref CRC = $CRC";
     return TRUE;
   }
-  Log3 "checkCRC4", 5, "CUL_TCM97001 checkCRC4 FAILED for msg=($msg)";
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 PFR_130 ERROR, checksum not ok!, calc CRC = $CRC, ref CRC = " . hex($a[8]);
   return FALSE;
 }
 #
@@ -252,19 +248,20 @@ sub checkCRC4 {
 #
 
 sub isRain {
+  my $hash = shift;
   my $msg = shift;
   my @a = split("", $msg);
   if(scalar(@a)<9){
-    Log3 "isRain", 5, "CUL_TCM97001 isRain failed for msg=($msg) length<9";
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 isRain failed for msg=($msg) length<9";
     return FALSE;
   }
   # if bit 0 of nibble 2 is 1 then this is no rain data
   my $isRainData = ( (hex($a[2]) & 1) );
   if ($isRainData == 1) {
-    Log3 "isRain", 5, "CUL_TCM97001 isRain for msg=($msg) = FALSE";
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 isRain for msg=($msg) = FALSE";
     return FALSE;
   }
-  Log3 "isRain", 5, "CUL_TCM97001 isRain for msg=($msg) = TRUE";
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 isRain for msg=($msg) = TRUE";
   return TRUE;
 }
 
@@ -272,27 +269,20 @@ sub isRain {
 # CRC Check for KW9010....
 #
 sub checkCRCKW9010 {
+  my $hash = shift;
   my $msg = shift;
-  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 crc calc for: $msg";
-  my @a = split("", $msg);
-  my $bitReverse = "";
-  my $x = undef;
-  foreach $x (@a) {
-     my $bin3=sprintf("%04b",hex($x));
-    $bitReverse = $bitReverse . reverse($bin3); 
+  my @decReverse = ();
+  my $binrev;
+  foreach my $x (split('', $msg)) {
+    $binrev = reverse(sprintf("%04b",hex($x)));
+    push (@decReverse, oct("0b".$binrev));
   }
-  my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-
-  #Split reversed a again
-  my @aReverse = split("", $hexReverse);
-
-  my $CRC = (hex($aReverse[0])+hex($aReverse[1])+hex($aReverse[2])+hex($aReverse[3])
-            +hex($aReverse[4])+hex($aReverse[5])+hex($aReverse[6])+hex($aReverse[7])) & 15;
-  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 calc crc is: $CRC";
-  Log3 "CUL_TCM97001", 5 , "CUL_TCM97001 checkCRCKW9010 ref crc is :".hex($aReverse[8]);
-  if ($CRC == hex($aReverse[8])) {
-      return TRUE;
+  my $CRC = ($decReverse[0]+$decReverse[1]+$decReverse[2]+$decReverse[3]+$decReverse[4]+$decReverse[5]+$decReverse[6]+$decReverse[7]) & 15;
+  if ($CRC == $decReverse[8]) {
+    Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 KW9010 checksum ok, calc CRC = ref CRC = $CRC";
+    return TRUE;
   }
+  Log3 $hash, 5 , $hash->{NAME} . ": CUL_TCM97001 KW9010 ERROR, checksum not ok!, calc CRC = $CRC, ref CRC = $decReverse[8]";
   return FALSE;
 }
 
@@ -711,7 +701,7 @@ CUL_TCM97001_Parse($$)
 		  
 		  if (checkValues($hash,"AURIOL",$temp)) {
 			$batbit = (hex($a[2]) & 0x8) >> 3;
-			$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+			#$batbit = ~$batbit & 0x1; # Bat bit umdrehen
 			$mode   = (hex($a[2]) & 0x4) >> 2;
 
 			$trend = (hex($a[7]) & 0x3);
@@ -861,7 +851,7 @@ CUL_TCM97001_Parse($$)
     }
 
 		### inserted by elektron-bbs for rain gauge Ventus W174
-		if (checksum_W174($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "W174")) {
+		if (checksum_W174($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "W174")) {
    	   # VENTUS W174 Rain gauge
    	   # Documentation also at http://www.tfd.hu/tfdhu/files/wsprotocol/auriol_protocol_v20.pdf
 			# send interval 36 seconds
@@ -876,7 +866,7 @@ CUL_TCM97001_Parse($$)
    	   # *   D = Rain (bitvalue * 0.25 mm)
    	   # *   E = Checksum
    	   # *   F = 0000 0000 (W174!!!)
-			my @a = split("", $msg);
+         my @a = split("", $msg);
          my $bitReverse = "";
          my $bitUnreverse = "";
          my $x = undef;
@@ -946,7 +936,7 @@ CUL_TCM97001_Parse($$)
 		}
     
 ### inserted by pejonp 3.2.2018 Ventus W132/W044
-   if (checksum_W155($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "TCM21...." || $readedModel eq "W044" || $readedModel eq "W132")) {
+   if (checksum_W155($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "TCM21...." || $readedModel eq "W044" || $readedModel eq "W132")) {
         # Long with tmp
         # All nibbles must be reversed  
         # e.g. 154E800480	   0001	0101 0100 1110 1000	0000 0000 0100 1000	0000
@@ -1368,7 +1358,7 @@ CUL_TCM97001_Parse($$)
       }
     }
 
-      if ( (checkCRC4($msg) == TRUE) && (isRain($msg)==TRUE) &&($readedModel eq "PFR_130" || $readedModel eq "Unknown")) {
+      if ( (checkCRC4($hash, $msg) == TRUE) && (isRain($hash, $msg)==TRUE) &&($readedModel eq "PFR_130" || $readedModel eq "Unknown")) {
       # Implementation from Femduino
       # Pollin PFR_130)
       # nibbles n2, n6 and n7 hold the Rain fall ticks
@@ -1446,78 +1436,8 @@ CUL_TCM97001_Parse($$)
       }
     }
 
-    #if ( (isRain($msg)!=TRUE) && ($readedModel eq "Unknown") && ($readedModel ne "PFR_130") && length($msg) == 10) {
-    if (($readedModel eq "AURIOL" || $readedModel eq "Unknown")) {
-      # Implementation from Femduino
-      # AURIOL (Lidl Version: 09/2013), Z31743B IAN 91838
-      #                /--------------------------------- Channel, changes after every battery change      
-      #               /           / ------------------------ Battery state 1 == Ok      
-      #              /           / /------------------------ Battery changed, Sync startet      
-      #             /           / /  ----------------------- Unknown      
-      #            /           / / /    /--------------------- neg Temp: if 1 then temp = temp - 4096
-      #           /           / / /    /---------------------- 12 Bit Temperature
-      #          /           / / /    /               /---------- ??? CRC 
-      #         /           / / /    /               /       /---- Trend 10 == rising, 01 == falling
-      #         0101 0101  1 0 00   0001 0000 1011  1100  01 00
-      # Bit     0          8 9 10   12              24       30
-      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
-      if($def) {
-        $name = $def->{NAME};
-      } 
-      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
-      my $negative    = (hex($a[3])) & 0x8; 
-      if ($negative == 0x8) {
-        $temp = (~$temp & 0x07FF) + 1;
-        $temp = -$temp;
-      }
-      $temp = $temp / 10;
-
-      if (checkValues($hash,"AURIOL",$temp)) {
-        $batbit = (hex($a[2]) & 0x8) >> 3;
-        $batbit = ~$batbit & 0x1; # Bat bit umdrehen
-        $mode   = (hex($a[2]) & 0x4) >> 2;
-
-        $trend = (hex($a[7]) & 0x3);
-        $model="AURIOL";
-        my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
-     	{	
-		  	if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
-          	{
-	             $deviceCode="CUL_TCM97001_".$idType1;
-	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model, deviceCode: $deviceCode";
-           	} else {
-	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
-           	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
-     	}     
-      
-      	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
-      	if($def) {
-       	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
-        }
-
-        $hasbatcheck = TRUE;
-        $hastrend = TRUE;     
-        $packageOK = TRUE;
-        $hasmode = TRUE;
-        
-        $readedModel=$model;
-      } else {
-          $name = "Unknown";
-      }
-    }
-
-    
     #if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
-    if (checkCRCKW9010($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
+    if (checkCRCKW9010($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
         # Re: Tchibo Wetterstation 433 MHz - KW9010
         # See also http://forum.arduino.cc/index.php?PHPSESSID=ffoeoe9qeuv7rf4fh0d637hd74&topic=136836.msg1536416#msg1536416
         #                 /------------------------------------- Random ID part one      
@@ -1542,12 +1462,10 @@ CUL_TCM97001_Parse($$)
         my $bitReverse = "";
         my $x = undef;
         foreach $x (@a) {
-		    $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 
+           $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 
         }
-        Log3 $hash, 5 , "$iodev: KW9010 CRC Matched: ($bitReverse)";
-        
         my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-        Log3 $hash, 5 , "$iodev: KW9010 CRC Hex Matched: $hexReverse";
+        Log3 $hash, 5 , "$iodev: KW9010 CRC Matched: ($bitReverse) Hex: $hexReverse";
 
         #Split reversed a again
         my @aReverse = split("", $hexReverse);
@@ -1562,12 +1480,9 @@ CUL_TCM97001_Parse($$)
            $temp = (hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256)/10;
         }
         $humidity = hex($aReverse[7].$aReverse[6]) - 156;
-        
-		### edited by @HomeAutoUser				
-		if (checkValues($hash,"KW9010",$temp, $humidity)) {				# unplausibel Werte sonst teilweise
 
-            Log3 $hash, 5 , "$iodev: KW9010 values are matching";
-            
+        ### edited by @HomeAutoUser				
+        if (checkValues($hash,"KW9010",$temp, $humidity)) {				# unplausibel Werte sonst teilweise
             $batbit = (hex($a[2]) & 0x8) >> 3;
             #$mode = (hex($a[2]) & 0x4) >> 2; 
             $channel = ((hex($a[1])) & 0xC) >> 2;
@@ -1669,6 +1584,74 @@ CUL_TCM97001_Parse($$)
         $readedModel=$model;
       } else {
         $name = "Unknown";
+      }
+    }
+    
+      if (($readedModel eq "AURIOL" || $readedModel eq "Unknown")) {
+      # Implementation from Femduino
+      # AURIOL (Lidl Version: 09/2013), Z31743B IAN 91838
+      #                /--------------------------------- Channel, changes after every battery change      
+      #               /           / ------------------------ Battery state 1 == Ok      
+      #              /           / /------------------------ Battery changed, Sync startet      
+      #             /           / /  ----------------------- Unknown      
+      #            /           / / /    /--------------------- neg Temp: if 1 then temp = temp - 4096
+      #           /           / / /    /---------------------- 12 Bit Temperature
+      #          /           / / /    /               /---------- ??? CRC 
+      #         /           / / /    /               /       /---- Trend 10 == rising, 01 == falling
+      #         0101 0101  1 0 00   0001 0000 1011  1100  01 00
+      # Bit     0          8 9 10   12              24       30
+      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
+      if($def) {
+        $name = $def->{NAME};
+      } 
+      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
+      my $negative    = (hex($a[3])) & 0x8; 
+      if ($negative == 0x8) {
+        $temp = (~$temp & 0x07FF) + 1;
+        $temp = -$temp;
+      }
+      $temp = $temp / 10;
+
+      if (checkValues($hash,"AURIOL",$temp)) {
+        $batbit = (hex($a[2]) & 0x8) >> 3;
+        #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+        $mode   = (hex($a[2]) & 0x4) >> 2;
+
+        $trend = (hex($a[7]) & 0x3);
+        $model="AURIOL";
+        my $deviceCode;
+     
+     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+     	{	
+		  	if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+          	{
+	             $deviceCode="CUL_TCM97001_".$idType1;
+	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model, deviceCode: $deviceCode"; # deviceCode nur zum debuggen
+           	} else {
+	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+           	}
+     	}  else  {  # Fallback for already defined devices use old naming convention
+     		$deviceCode=$idType1;
+     	}     
+      
+      	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+      	if($def) {
+       	 $name = $def->{NAME};
+      	} 
+      	      	
+        if(!$def) {
+          Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+
+        $hasbatcheck = TRUE;
+        $hastrend = TRUE;     
+        $packageOK = TRUE;
+        $hasmode = TRUE;
+        
+        $readedModel=$model;
+      } else {
+          $name = "Unknown";
       }
     }
 
@@ -1848,6 +1831,9 @@ CUL_TCM97001_Parse($$)
       }
     }
     if ($hasbatcheck) {
+      if (AttrVal($name, "negation-batt", 0)) {
+        $batbit = $batbit ? 0 : 1;	# Bat bit umdrehen
+      }
       my $battery = ReadingsVal($name, "battery", "unknown");
       my $bat = $batbit eq "1" ? "ok" : "low";
       $logtext .= " Bat: $bat";
@@ -2016,6 +2002,7 @@ CUL_TCM97001_Parse($$)
        Maximum permissible deviation of the measured temperature from the previous value in Kelvin.</li>
     <li>max-diff-rain: Default:0 (deactive)<br>
        Maximum permissible deviation of the rainfall to the previous value in l/qm.</li>
+    <li>negation-batt: invert Battery reading</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li>windDirectionInverse: If the anemometer has been mounted upside down, the wind direction can be turned around</li>
@@ -2089,6 +2076,7 @@ CUL_TCM97001_Parse($$)
          Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.</li>
     <li>max-diff-rain: Default:0 (deaktiviert)<br>
          Maximal erlaubte Abweichung der Regenmenge zum vorhergehenden Wert in l/qm.</li>
+    <li>negation-batt: Battery reading invertieren</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li>windDirectionInverse: Wenn der Windmesser auf dem Kopf montiert wurde, kann damit die Windrichtung herumgedreht werden.</li>
