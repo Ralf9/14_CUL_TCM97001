@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-25 20:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-27 20:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -364,6 +364,11 @@ CUL_TCM97001_Parse($$)
   $msg = substr($msg, 1);
   my @a = split("", $msg);
   my $iodev = $hash->{NAME};
+  
+  my $longids = AttrVal($iodev,'longids',1);
+  if ($longids =~ m/CUL_TCM97001_ShortIDs/) {	# Enable short ID support
+    $enableLongIDs = FALSE;
+  }
 
   my $id3 = hex($a[0] . $a[1]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
@@ -439,9 +444,6 @@ CUL_TCM97001_Parse($$)
   my $rainticks = undef;
   my $rainMM = undef;
   
-  
-
-  my $longids = AttrVal($iodev,'longids',1);
 
   if (length($msg) == 8) {
     # Only tmp TCM device
@@ -703,7 +705,7 @@ CUL_TCM97001_Parse($$)
 			$batbit = (hex($a[2]) & 0x8) >> 3;
 			#$batbit = ~$batbit & 0x1; # Bat bit umdrehen
 			$mode   = (hex($a[2]) & 0x4) >> 2;
-
+			$channel = 0;
 			$trend = (hex($a[7]) & 0x3);
 			$model="AURIOL";
 			
@@ -715,7 +717,7 @@ CUL_TCM97001_Parse($$)
 				} else {
 					 $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
 				}
-			}     
+			}
 		  
 			$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
 			if($def) {
@@ -750,9 +752,20 @@ CUL_TCM97001_Parse($$)
     $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};   # test for already defined devices use old naming convention 
     #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
     #my $def3 = $modules{CUL_TCM97001}{defptr}{$idType3};
+    
     if(!$def) {
-       $deviceCode = "CUL_TCM97001_" . $idType1;          # use new naming convention
-       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       my $a0 = hex($a[0]);
+       if ($a0 == 5 || $a0 == 9) {	# Prologue oder NC_WS
+          $deviceCode = "CUL_TCM97001_" . $a0 . "_" . hex($a[1] . $a[2]);
+          $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+          if(!$def) {
+            $deviceCode = "CUL_TCM97001_" . $idType1;          # use new naming convention
+            $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+          }
+       } else {
+         $deviceCode = "CUL_TCM97001_" . $idType1;          # use new naming convention
+         $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       }
     }
     if($def) {
        $name = $def->{NAME};
@@ -1146,7 +1159,7 @@ CUL_TCM97001_Parse($$)
           	{
 	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
-	             $deviceCode="$iodev: CUL_TCM97001_" . $model . "_" . $channel;
+	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
      	}     
       
@@ -1197,11 +1210,9 @@ CUL_TCM97001_Parse($$)
         if (!(hex($a[7]) == 0xC && hex($a[8]) == 0xC)) {
           $humidity = hex($a[7].$a[8]);
         }
-
-        
         
         if (checkValues($hash, "Prologue", $temp, $humidity)) {
-            $channel = (hex($a[3])) & 0x3;
+            $channel = ((hex($a[3])) & 0x3) + 1;
             $batbit = (hex($a[3]) & 0x8) >> 3;
             $batbit = ~$batbit & 0x1; # Bat bit umdrehen
             $mode = (hex($a[3]) & 0x4) >> 2;
@@ -1209,16 +1220,16 @@ CUL_TCM97001_Parse($$)
             $model="Prologue";
             
             if ($deviceCode ne $idType1)  # new naming convention
-         	{	
-		      	if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
-              	{
-		             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
-               	} else {
-		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
-               	}
-         	}     
+            {
+               if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+               {
+                  Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+               } else {
+                  $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+               }
+            }
           
-          	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+            $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
             if($def) {
               $name = $def->{NAME};
             }         
@@ -1226,11 +1237,17 @@ CUL_TCM97001_Parse($$)
                 Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
+            if ($deviceCode =~ m/_9_/) {
+                $def->{AlternativeDEFcode} = "CUL_TCM97001_$idType1";
+            } elsif ($deviceCode eq "CUL_TCM97001_$idType1") {	# nur bei longid
+                $def->{AlternativeDEFcode} = "CUL_TCM97001_9_" . hex($a[1] . $a[2]);
+            }
+            
             if (defined($humidity)) {
                 if ($humidity >= 20) {
                   $hashumidity = TRUE;
-                }  
-            }  
+                }
+            }
             $hasbatcheck = TRUE;
             $hasmode = TRUE;
             $packageOK = TRUE;
@@ -1244,6 +1261,7 @@ CUL_TCM97001_Parse($$)
     
     if ($readedModel eq "NC_WS" || (hex($a[0]) == 0x5 && $readedModel eq "Unknown")) {
       # Implementation from Femduino
+      # Protocol prologue start everytime with 0101
       # PEARL NC7159, LogiLink WS0002
       #                 /--------------------------------- Sensdortype      
       #                /     / ---------------------------- ID, changes after every battery change      
@@ -1271,7 +1289,7 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($hash, "NC_WS", $temp, $humidity)) {
      	$model="NC_WS";
-     	$channel = (hex($a[3])) & 0x3;
+     	$channel = ((hex($a[3])) & 0x3) + 1;
      	$batbit = (hex($a[3]) & 0x8) >> 3;
       	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
       	$mode = (hex($a[3]) & 0x4) >> 2;
@@ -1294,6 +1312,11 @@ CUL_TCM97001_Parse($$)
         if(!$def) {
           Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
           return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+        }
+        if ($deviceCode =~ m/_5_/) {
+          $def->{AlternativeDEFcode} = "CUL_TCM97001_$idType1";
+        } elsif ($deviceCode eq "CUL_TCM97001_$idType1") {	# nur bei longid
+          $def->{AlternativeDEFcode} = "CUL_TCM97001_5_" . hex($a[1] . $a[2]);
         }
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;
@@ -1329,6 +1352,7 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($hash,"Rubicson",$temp)) {
         $model="Rubicson";
+        $channel = 0;
         
         if ($deviceCode ne $idType1)  # new naming convention
      	{	
@@ -1336,7 +1360,7 @@ CUL_TCM97001_Parse($$)
           	{
 	             Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            	} else {
-	             $deviceCode="CUL_TCM97001_" . $model;
+	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
      	}     
       
@@ -1616,7 +1640,7 @@ CUL_TCM97001_Parse($$)
         $batbit = (hex($a[2]) & 0x8) >> 3;
         #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode   = (hex($a[2]) & 0x4) >> 2;
-
+        $channel = 0;
         $trend = (hex($a[7]) & 0x3);
         $model="AURIOL";
         my $deviceCode;
@@ -1683,7 +1707,7 @@ CUL_TCM97001_Parse($$)
         $batbit = (hex($a[2]) & 0x8) >> 3;
         $mode    = hex($a[2]) & 0x1;
         $mode    = (~$mode & 0x1);
-
+        $channel = 0;
         $model="TCM218943";
 
         if ($deviceCode ne $idType1)  # new naming convention
@@ -1692,7 +1716,7 @@ CUL_TCM97001_Parse($$)
            {
               Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
            } else {
-              $deviceCode="CUL_TCM97001_" . $model;
+              $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            }
         }
 
