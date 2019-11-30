@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-27 20:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2019-11-30 17:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -65,6 +65,7 @@ my %models = (
     "NC_WS"       => 'NC_WS',
     "GT_WT_02"    => 'GT_WT_02',
     "AURIOL"      => 'AURIOL',
+    "Auriol_Z31743B" => 'Auriol_Z31743B',
     "Auriol_IAN"  => 'Auriol_IAN',
     "PFR_130"      => 'PFR_130',
     "Type1"       => 'Type1',
@@ -444,7 +445,11 @@ CUL_TCM97001_Parse($$)
   my $rainticks = undef;
   my $rainMM = undef;
   
-
+  if (length($msg) == 12 && AttrVal($name, "model", "Unknown") eq "Auriol_Z31743B") {	# es kann beim Modell Auriol_Z31743B ab und zu vorkommen, dass die msg zu lang ist
+    Log3 $name, 4, "$iodev: CUL_TCM97001 $name model: Auriol_Z31743B, msg:$msg too long!";
+    $msg = substr($msg,0,10);
+  }
+  
   if (length($msg) == 8) {
     # Only tmp TCM device
     #eg. 1000 1111 0100 0011 0110 1000 = 21.8C
@@ -675,7 +680,7 @@ CUL_TCM97001_Parse($$)
 		}
 		$readedModel = AttrVal($name, "model", "Unknown");
 		
-	if ($readedModel eq "AURIOL" || $readedModel eq "Unknown") {
+	if ($readedModel eq "AURIOL" || $readedModel eq "Auriol_Z31743B" || $readedModel eq "Unknown") {
 		  # Implementation from Femduino
 		  # AURIOL (Lidl Version: 09/2013)
 		  #                /--------------------------------- Channel, changes after every battery change      
@@ -688,6 +693,27 @@ CUL_TCM97001_Parse($$)
 		  #         /           / / /    /               /       /---- Trend 10 == rising, 01 == falling
 		  #         0101 0101  1 0 00   0001 0000 1011  1100  01 00
 		  # Bit     0          8 9 10   12              24       30
+		  
+		  my $check_Z31743B = TRUE;
+		  if ($readedModel eq "Auriol_Z31743B") {
+		    my $xbin = "";
+		    my $checksum = 0;
+		    foreach my $x (split('', $msg)) {
+		      $xbin .= sprintf("%04b",hex($x));
+		    }
+		    for (my $x = 0; $x < 31; $x++) {
+		      $checksum ^= substr($xbin, $x, 1);
+		    }
+		    if ($checksum ne substr($xbin, 31,1)) {
+		      Log3 $name, 3, "$iodev: CUL_TCM97001 $name: ERROR Model: Auriol_Z31743B msg: $msg, checksum (parity) not ok, calc $checksum, ref " . substr($xbin, 31, 1);
+		      $check_Z31743B = FALSE;
+		    }
+		    if ($check_Z31743B && (hex($a[2]) & 7) != 0) {	# Bit 0 - 2 muessen 0 sein
+		      Log3 $name, 3, "$iodev: CUL_TCM97001 $name: ERROR Model: Auriol_Z31743B msg: $msg, 3.digit must be 0 or 8";
+		      $check_Z31743B = FALSE;
+		    }
+		  }
+		  
 		  $def = $modules{CUL_TCM97001}{defptr}{$idType1};
 		  if($def) {
 			$name = $def->{NAME};
@@ -699,15 +725,18 @@ CUL_TCM97001_Parse($$)
 			$temp = -$temp;
 		  }
 		  $temp = $temp / 10;
-
-		  
-		  if (checkValues($hash,"AURIOL",$temp)) {
+		
+		  if (checkValues($hash,"AURIOL",$temp) && $check_Z31743B) {
 			$batbit = (hex($a[2]) & 0x8) >> 3;
 			#$batbit = ~$batbit & 0x1; # Bat bit umdrehen
 			$mode   = (hex($a[2]) & 0x4) >> 2;
 			$channel = 0;
 			$trend = (hex($a[7]) & 0x3);
-			$model="AURIOL";
+			if ($readedModel eq "Unknown") {
+			  $model="AURIOL";
+			} else {
+			  $model=$readedModel;
+			}
 			
 			if ($deviceCode ne $idType1)  # new naming convention
 			{	
@@ -730,9 +759,11 @@ CUL_TCM97001_Parse($$)
 			}
 
 			$hasbatcheck = TRUE;
-			$hastrend = TRUE;     
+			if ($model eq "AURIOL") {
+			  $hastrend = TRUE;
+			  $hasmode = TRUE;
+			}
 			$packageOK = TRUE;
-			$hasmode = TRUE;
 			
 			$readedModel=$model;
 		  } else {
@@ -1545,7 +1576,7 @@ CUL_TCM97001_Parse($$)
         }
     }
 
-    if ($readedModel eq "Auriol_IAN" || (hex($a[9]) >= 1 && hex($a[9] <= 3 && $readedModel eq "Unknown"))) {
+    if ($readedModel eq "Auriol_IAN" || (hex($a[9]) >= 1 && hex($a[9]) <= 3 && $readedModel eq "Unknown")) {
         # Auriol Message Format (rflink/Plugin_044.c):
         # 0    4    8    12   16   20   24   28   32   36
         # 1011 1111 1001 1010 0110 0001 1011 0100 1001 0001
@@ -1960,7 +1991,7 @@ CUL_TCM97001_Parse($$)
 
 =pod
 =item summary    This module interprets temperature sensor messages.
-=item summary_DE Module verarbeitet empfangene Nachrichten von Temp-Sensoren & Wettersensoren.
+=item summary_DE Modul verarbeitet empfangene Nachrichten von Temp-Sensoren & Wettersensoren.
 =begin html
 
 <a name="CUL_TCM97001"></a>
@@ -1971,17 +2002,17 @@ CUL_TCM97001_Parse($$)
   <b>Supported models:</b>
   <ul>
     <li>ABS700</li>
-    <li>AURIOL</li>
+    <li>AURIOL (older Sensors with only Temperature)</li>
     <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
-    <li>NC_WS</li>
+    <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
     <li>PFR-130 (rain)</li>
-    <li>Prologue</li>
+    <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
     <li>Ventus W155(Auriol): W044(temp/hum) W132(wind) W174(rain)</li>
     </ul>
@@ -2042,22 +2073,23 @@ CUL_TCM97001_Parse($$)
 <a name="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
-  Das CUL_TCM97001 Module verarbeitet von einem IO Ger&auml;t (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
+  Das CUL_TCM97001 Modul verarbeitet von einem IO Ger&auml;t (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
   <br>
   <b>Unterst&uuml;tzte Modelle:</b>
   <ul>
     <li>ABS700</li>
-    <li>AURIOL</li>
+    <li>AURIOL (&auml;ltere Sensoren mit nur Temperatur)</li>
     <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
+    <li>Auriol_Z31743B</li>
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
-    <li>NC_WS</li>
+    <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
     <li>PFR-130 (rain)</li>
-    <li>Prologue</li>
+    <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
     <li>Ventus W155(Auriol): W044(temp/hum) W132(wind) W174(rain)</li>
       </ul>
@@ -2068,7 +2100,7 @@ CUL_TCM97001_Parse($$)
   <a name="CUL_TCM97001_Define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
-  Die ID der angelgten Sensoren sind die ersten zwei HEX Werte des empfangenen Paketes in dezimaler Schreibweise.<br>
+  Die ID der angelegten Sensoren sind die ersten zwei HEX Werte des empfangenen Paketes in dezimaler Schreibweise.<br>
   </ul>
   <br>
   <a name="CUL_TCM97001 Events"></a>
