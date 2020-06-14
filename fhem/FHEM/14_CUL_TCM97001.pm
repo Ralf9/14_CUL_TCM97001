@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2019-11-30 17:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2020-06-14 12:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -297,8 +297,9 @@ sub checkCRC_Mebus {
 
   my $CRC = ((hex($a[1])+hex($a[2])+hex($a[3])
             +hex($a[4])+hex($a[5])+hex($a[6])) -1) & 15;
-  my $CRCCHECKVAL= (hex($a[0])); 
+  my $CRCCHECKVAL= (hex($a[0]));
   if ($CRC == $CRCCHECKVAL) {
+      #Log3 "Unknown", 5 , "CUL_TCM97001 Mebus checksum ok, crc = $CRC";
       return TRUE;
   }
   return FALSE;
@@ -314,6 +315,7 @@ sub checkCRC_GTWT02 {
             +hex($a[4])+hex($a[5])+hex($a[6])+(hex($a[7]) & 0xE));
   my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
   if ($CRC  % 64 == $CRCCHECKVAL) {
+      #Log3 "Unknown", 5 , "CUL_TCM97001 GT_WT_02 checksum ok, crc = $CRC";
       return TRUE;
   }
   return FALSE;
@@ -330,6 +332,7 @@ sub checkCRC_Type1 {
             +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7]));
   my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
   if ($CRC == $CRCCHECKVAL) {
+      #Log3 "Unknown", 5 , "CUL_TCM97001 Type1 checksum ok, crc = $CRC";
       return TRUE;
   }
   return FALSE;
@@ -470,7 +473,7 @@ CUL_TCM97001_Parse($$)
       
 		# Sanity check temperature
 		if($def) {
-			my $timeSinceLastUpdate = ReadingsAge($iodev, "state", 0);
+			my $timeSinceLastUpdate = ReadingsAge($name, "state", 0);
 			if ($timeSinceLastUpdate < 0) {
 				$timeSinceLastUpdate *= -1;
 				}
@@ -926,7 +929,7 @@ CUL_TCM97001_Parse($$)
          Log3 $hash,5, "$iodev: CUL_TCM97001 $name nibble 2: $aReverse[2] , nibble 3: $aReverse[3]";
          # Nibble 2 must be x110 for rain gauge 
          # Nibble 3 must be 0x03 for rain gauge
-         if ((hex($aReverse[2]) >> 1) == 3 && $aReverse[3] == 0x03) {
+         if ((hex($aReverse[2]) >> 1) == 3 && hex($aReverse[3]) == 0x03) {
             Log3 $hash,4, "$iodev: CUL_TCM97001 $name detected rain gauge message ok";
             $batbit = $aReverse[2] & 0b0001;									# Bat bit normal=0, low=1
             Log3 $hash,4, "$iodev: CUL_TCM97001 $name battery bit: $batbit";
@@ -943,11 +946,11 @@ CUL_TCM97001_Parse($$)
             if($def) {
 			   $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
 			   my $hash = $def;
-               my $timeSinceLastUpdate = ReadingsAge($iodev, "state", 0);
+			   $name = $def->{NAME};
+               my $timeSinceLastUpdate = ReadingsAge($name, "state", 0);
 			   if ($timeSinceLastUpdate < 0) {
 					$timeSinceLastUpdate *= -1;
 					}
-               $name = $def->{NAME};
                if (defined($hash->{READINGS}{rain}{VAL})) {
                   my $diffRain = 0;
                   my $oldRain = $hash->{READINGS}{rain}{VAL};
@@ -1613,7 +1616,7 @@ CUL_TCM97001_Parse($$)
         {
            if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
            {
-              Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+              Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            } else {
               $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            }
@@ -1624,7 +1627,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }
         if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
         }
         #if ($humidity >= 20) {
@@ -1745,7 +1748,7 @@ CUL_TCM97001_Parse($$)
         {
            if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
            {
-              Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
+              Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
            } else {
               $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            }
@@ -1756,7 +1759,7 @@ CUL_TCM97001_Parse($$)
           $name = $def->{NAME};
         }
         if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
+            Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
             return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode";
         }
         if ($humidity >= 20) {
