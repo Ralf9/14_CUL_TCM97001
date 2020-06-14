@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2020-06-14 12:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2020-06-14 16:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -373,11 +373,20 @@ CUL_TCM97001_Parse($$)
   if ($longids =~ m/CUL_TCM97001_ShortIDs/) {	# Enable short ID support
     $enableLongIDs = FALSE;
   }
+  
+  my $def = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
+  my $nameUnknown;
+  if ($def) {
+    $nameUnknown = $def->{NAME};
+  }
+  else {
+    $nameUnknown = "Unknown";
+  }
 
   my $id3 = hex($a[0] . $a[1]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
-  my $def = $modules{CUL_TCM97001}{defptr}{$id3}; # test for already defined devices use old naming convention  
+  $def = $modules{CUL_TCM97001}{defptr}{$id3}; # test for already defined devices use old naming convention
   #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
   if(!$def) {
      $def = $modules{CUL_TCM97001}{defptr}{'CUL_TCM97001_'.$id3};  # use new naming convention
@@ -385,7 +394,7 @@ CUL_TCM97001_Parse($$)
   
   my $now = time();
 
-  my $name = "Unknown";
+  my $name = $nameUnknown;
   if($def) {
     $name = $def->{NAME};
   }
@@ -658,7 +667,7 @@ CUL_TCM97001_Parse($$)
             $haschannel = TRUE;
             $id3 = $idType2;
         } else {
-            $name = "Unknown";
+            $name = $nameUnknown;
         }
     }
 
@@ -770,7 +779,7 @@ CUL_TCM97001_Parse($$)
 			
 			$readedModel=$model;
 		  } else {
-			  $name = "Unknown";
+			  $name = $nameUnknown;
 		  }
 		}
 	}
@@ -893,7 +902,7 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
         } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
         }
     }
 
@@ -1140,7 +1149,7 @@ CUL_TCM97001_Parse($$)
       Log3 $hash,5, "$iodev: CUL_TCM97001_09:  model:$model Rmodel:$readedModel Mode:$hasmode P:$packageOK  ";
       Log3 $hash,5, "$iodev: CUL_TCM97001_10:  Channel:$channel B:$hasbatcheck BAT:$batbit W:$haswindspeed Wind: $windDirection ";
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
        }
     }
 
@@ -1213,7 +1222,7 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
       }
     }
     
@@ -1289,7 +1298,7 @@ CUL_TCM97001_Parse($$)
             
             $readedModel=$model;
         } else {
-            $name = "Unknown";
+            $name = $nameUnknown;
         }
     } 
     
@@ -1359,7 +1368,7 @@ CUL_TCM97001_Parse($$)
         $haschannel = TRUE; 
         $readedModel=$model; 
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
       }
     } 
 
@@ -1412,7 +1421,7 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
       }
     }
 
@@ -1490,7 +1499,7 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
       }
     }
 
@@ -1575,7 +1584,7 @@ CUL_TCM97001_Parse($$)
             
             $readedModel=$model;
         } else {
-            $name = "Unknown";
+            $name = $nameUnknown;
         }
     }
 
@@ -1641,7 +1650,7 @@ CUL_TCM97001_Parse($$)
 
         $readedModel=$model;
       } else {
-        $name = "Unknown";
+        $name = $nameUnknown;
       }
     }
     
@@ -1709,7 +1718,7 @@ CUL_TCM97001_Parse($$)
         
         $readedModel=$model;
       } else {
-          $name = "Unknown";
+          $name = $nameUnknown;
       }
     }
 
@@ -1772,7 +1781,7 @@ CUL_TCM97001_Parse($$)
 
         $readedModel=$model;
       } else {
-        $name = "Unknown";
+        $name = $nameUnknown;
       }
     }
   }
