@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2020-06-14 16:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2020-07-15 20:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -72,6 +72,7 @@ my %models = (
     "Mebus"       => 'Mebus',
     "Eurochron"   => 'Eurochron',
     "KW9010"      => 'KW9010',
+    "KW9015"      => 'KW9015',
     "Unknown"     => 'Unknown',
     "W174"        => 'W174',
     "W044"        => 'W044',
@@ -114,6 +115,7 @@ CUL_TCM97001_Initialize($)
             "Auriol_IAN.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "PFR_130.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "KW9010.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},      
+            "KW9015.*" => {  ATTR => "event-on-change-reading:.*", GPLOT => "", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "TCM97001.*" => {  ATTR => "event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:340"},
             "W174.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "rain4:Rain,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "W044.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
@@ -820,7 +822,7 @@ CUL_TCM97001_Parse($$)
     #  $name = $def->{NAME};
     }
     $readedModel = AttrVal($name, "model", "Unknown");
-    Log3 $name, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
+    Log3 $iodev, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
     
     if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown" && $hash->{TYPE} ne "SIGNALduino") && $syncBit[1] < 5000)) {
       # EAS 800 
@@ -1504,7 +1506,7 @@ CUL_TCM97001_Parse($$)
     }
 
     #if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
-    if (checkCRCKW9010($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
+    if (checkCRCKW9010($hash, $msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010" || $readedModel eq "KW9015")) {
         # Re: Tchibo Wetterstation 433 MHz - KW9010
         # See also http://forum.arduino.cc/index.php?PHPSESSID=ffoeoe9qeuv7rf4fh0d637hd74&topic=136836.msg1536416#msg1536416
         #                 /------------------------------------- Random ID part one      
@@ -1532,7 +1534,7 @@ CUL_TCM97001_Parse($$)
            $bitReverse = $bitReverse . reverse(sprintf("%04b",hex($x))); 
         }
         my $hexReverse = unpack("H*", pack ("B*", $bitReverse));
-        Log3 $hash, 5 , "$iodev: KW9010 CRC Matched: ($bitReverse) Hex: $hexReverse";
+        Log3 $hash, 5 , "$iodev: KW901x CRC Matched: ($bitReverse) Hex: $hexReverse";
 
         #Split reversed a again
         my @aReverse = split("", $hexReverse);
@@ -1546,17 +1548,39 @@ CUL_TCM97001_Parse($$)
            # positive temp
            $temp = (hex($aReverse[3]) + hex($aReverse[4]) * 16 + hex($aReverse[5]) * 256)/10;
         }
-        $humidity = hex($aReverse[7].$aReverse[6]) - 156;
+        my $rainHum = hex($aReverse[7].$aReverse[6]);
+        
+        my $retCheck;
+        if ($readedModel eq "Unknown") {
+            $retCheck = checkValues($hash,"KW901x",$temp);
+            if ($retCheck) {
+                $model="KW9010";
+            }
+        } elsif ($readedModel eq "KW9010") {
+            $humidity = $rainHum - 156;
+            $retCheck = checkValues($hash,"KW9010",$temp, $humidity);
+            if ($retCheck) {
+                $hashumidity = TRUE;
+                $model="KW9010";
+            }
+        } else {
+            $retCheck = checkValues($hash,"KW9015",$temp);
+            if ($retCheck) {
+                $hasrain = TRUE;
+                $rain = $rainHum * 0.45;
+                $model="KW9015";
+            }
+        }
 
         ### edited by @HomeAutoUser				
-        if (checkValues($hash,"KW9010",$temp, $humidity)) {				# unplausibel Werte sonst teilweise
+        if ($retCheck) {				# unplausibel Werte sonst teilweise
             $batbit = (hex($a[2]) & 0x8) >> 3;
             #$mode = (hex($a[2]) & 0x4) >> 2; 
             $channel = ((hex($a[1])) & 0xC) >> 2;
             $mode = (hex($a[2]) & 0x1);
             $trend = (hex($a[2]) & 0x6) >> 1;
             
-            $model="KW9010";
+            #$model="KW9010";
             
             if ($deviceCode ne $idType1)  # new naming convention
          	{	
@@ -1576,7 +1600,7 @@ CUL_TCM97001_Parse($$)
                 Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
-            $hashumidity = TRUE;    
+            #$hashumidity = TRUE;
             $packageOK = TRUE;
             $hasbatcheck = TRUE;
             $hastrend = TRUE;  
