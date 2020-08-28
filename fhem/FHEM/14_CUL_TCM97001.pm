@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2020-07-15 20:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2020-08-28 17:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -115,7 +115,7 @@ CUL_TCM97001_Initialize($)
             "Auriol_IAN.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "PFR_130.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "KW9010.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},      
-            "KW9015.*" => {  ATTR => "event-on-change-reading:.*", GPLOT => "", FILTER => "%NAME", autocreateThreshold => "2:180"},
+            "KW9015.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "TCM97001.*" => {  ATTR => "event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:340"},
             "W174.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "rain4:Rain,", FILTER => "%NAME", autocreateThreshold => "2:180"},
             "W044.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},
@@ -269,7 +269,7 @@ sub isRain {
 }
 
 #
-# CRC Check for KW9010....
+# CRC Check for KW9010 and KW9015
 #
 sub checkCRCKW9010 {
   my $hash = shift;
@@ -338,6 +338,40 @@ sub checkCRC_Type1 {
       return TRUE;
   }
   return FALSE;
+}
+
+sub checkRain {
+  my $hash = shift;
+  my $iodev = shift;
+  my $rain = shift;
+  my $name = $hash->{NAME};
+  my $timeSinceLastUpdate = ReadingsAge($name, "state", 0);
+  
+  if ($timeSinceLastUpdate < 0) {
+    $timeSinceLastUpdate *= -1;
+  }
+  if (defined($hash->{READINGS}{rain}{VAL})) {
+    my $diffRain = 0;
+    my $oldRain = $hash->{READINGS}{rain}{VAL};
+    if ($rain > $oldRain) {
+       $diffRain = ($rain - $oldRain);
+    } else {
+       $diffRain = ($oldRain - $rain);
+    }
+    $diffRain = sprintf("%.1f", $diffRain);
+    Log3 $hash, 4, "$iodev: CUL_TCM97001 $name old rain $oldRain, age $timeSinceLastUpdate, new rain $rain, diff rain $diffRain";
+    my $maxDiffRain = AttrVal($name, "max-diff-rain", 0);
+    if ($maxDiffRain) {
+       $maxDiffRain += $timeSinceLastUpdate / 60; 					# 1.0 Liter/Minute + maxDiffRain
+       $maxDiffRain = sprintf("%.1f", $maxDiffRain + 0.05);			# round 0.1
+       Log3 $hash, 4, "$iodev: CUL_TCM97001 $name max difference rain $maxDiffRain l";
+       if ($diffRain > $maxDiffRain) {
+          Log3 $hash, 3, "$iodev: CUL_TCM97001 $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
+          return FALSE;
+       }
+    }
+  }
+  return TRUE
 }
 
 sub checkValues {
@@ -956,38 +990,13 @@ CUL_TCM97001_Parse($$)
             # Sanity check 
             if($def) {
 			   $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
-			   my $hash = $def;
 			   $name = $def->{NAME};
-               my $timeSinceLastUpdate = ReadingsAge($name, "state", 0);
-			   if ($timeSinceLastUpdate < 0) {
-					$timeSinceLastUpdate *= -1;
-					}
-               if (defined($hash->{READINGS}{rain}{VAL})) {
-                  my $diffRain = 0;
-                  my $oldRain = $hash->{READINGS}{rain}{VAL};
-                  if ($rain > $oldRain) {
-                     $diffRain = ($rain - $oldRain);
-                  } else {
-                     $diffRain = ($oldRain - $rain);
-                  }
-                  $diffRain = sprintf("%.1f", $diffRain);				
-                  Log3 $hash, 4, "$iodev: CUL_TCM97001 $name old rain $oldRain, age $timeSinceLastUpdate, new rain $rain, diff rain $diffRain";
-                  my $maxDiffRain = AttrVal($name, "max-diff-rain", 0);
-                  if ($maxDiffRain) {
-                     $maxDiffRain += $timeSinceLastUpdate / 60; 					# 1.0 Liter/Minute + maxDiffRain
-                     $maxDiffRain = sprintf("%.1f", $maxDiffRain + 0.05);						# round 0.1
-                     Log3 $hash, 4, "$iodev: CUL_TCM97001 $name max difference rain $maxDiffRain l";
-                     if ($diffRain > $maxDiffRain) {
-                        Log3 $hash, 3, "$iodev: CUL_TCM97001 $name ERROR - Rain diff too large (old $oldRain, new $rain, diff $diffRain)";
-                        return "";
-                     }
-                  }
-               }
+			   return "" if (checkRain($def, $iodev, $rain) == FALSE);
             } else {
                Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
-            Log3 $hash,4, "$iodev: CUL_TCM97001 $name rain total: $rain l/qm";
+            Log3 $iodev,4, "$iodev: CUL_TCM97001 $name rain total: $rain l/qm";
             $readedModel=$model;
 				$packageOK = TRUE;
 			}
@@ -1553,35 +1562,41 @@ CUL_TCM97001_Parse($$)
         my $retCheck;
         if ($readedModel eq "Unknown") {
             $retCheck = checkValues($hash,"KW901x",$temp);
-            if ($retCheck) {
-                $model="KW9010";
-            }
         } elsif ($readedModel eq "KW9010") {
             $humidity = $rainHum - 156;
             $retCheck = checkValues($hash,"KW9010",$temp, $humidity);
             if ($retCheck) {
                 $hashumidity = TRUE;
-                $model="KW9010";
             }
         } else {
             $retCheck = checkValues($hash,"KW9015",$temp);
             if ($retCheck) {
                 $hasrain = TRUE;
                 $rain = $rainHum * 0.45;
-                $model="KW9015";
             }
         }
 
-        ### edited by @HomeAutoUser				
         if ($retCheck) {				# unplausibel Werte sonst teilweise
             $batbit = (hex($a[2]) & 0x8) >> 3;
-            #$mode = (hex($a[2]) & 0x4) >> 2; 
+            $batbit = ~$batbit & 0x1; # Bat bit umdrehen
             $channel = ((hex($a[1])) & 0xC) >> 2;
             $mode = (hex($a[2]) & 0x1);
             $trend = (hex($a[2]) & 0x6) >> 1;
-            
-            #$model="KW9010";
-            
+            if ($trend == 1 || $trend == 2) { # falling und rising tauschen
+               $trend ^= 3;
+            }
+
+            if ($readedModel eq "Unknown") {
+               if ($channel > 0) {
+                  $model="KW9010";
+               }
+               else {
+                  $model="KW9015";
+               }
+            } else {
+               $model=$readedModel;
+            }
+
             if ($deviceCode ne $idType1)  # new naming convention
          	{	
 		      	if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
@@ -1595,8 +1610,9 @@ CUL_TCM97001_Parse($$)
           	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
             if($def) {
               $name = $def->{NAME};
-            }         
-            if(!$def) {
+              return "" if (checkRain($def, $iodev, $rain) == FALSE);
+            }
+            else {
                 Log3 $name, 2, "$iodev: CUL_TCM97001 Unknown device $deviceCode model:$model msg:s$msg, please define it";
                 return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
             }
@@ -1604,8 +1620,10 @@ CUL_TCM97001_Parse($$)
             $packageOK = TRUE;
             $hasbatcheck = TRUE;
             $hastrend = TRUE;  
-            $haschannel = TRUE; 
-            
+            if ($channel > 0) {
+                $haschannel = TRUE;
+            }
+            $hasmode = TRUE;
             $readedModel=$model;
         } else {
             $name = $nameUnknown;
@@ -1827,7 +1845,8 @@ CUL_TCM97001_Parse($$)
       $def->{lastT} = $now;
     }
     readingsBeginUpdate($def);
-    my ($val, $valH, $state);
+    my ($val, $valH);
+    my $state = "";
     
     if (defined($temp)) {
       $val = sprintf("%2.1f", ($temp) );
@@ -1878,6 +1897,7 @@ CUL_TCM97001_Parse($$)
       $state="$state RainH: $rainSumHour RainD: $rainSumDay R: $rainticks Rmm: $rainMM";
       Log3 $name, 5, "$iodev: CUL_TCM97001 $name $id3 state: $state"; 
    }
+      my $logtext = "";
       #zusaetzlich Daten fuer Wetterstation
     if ($hasrain == TRUE) {
          ### inserted by elektron-bbs
@@ -1890,6 +1910,10 @@ CUL_TCM97001_Parse($$)
          }
          readingsBulkUpdate($def, "rain", $rain );
          $state = "R: $rain";
+         if (defined($temp)) {
+            $state .= " T: $val";
+         }
+         $logtext = " R: $rain";
          $hasrain = FALSE;
     }
     if ($haswind == TRUE) {
@@ -1905,7 +1929,6 @@ CUL_TCM97001_Parse($$)
           $state = "Ws: $windSpeed ";
           $haswindspeed = FALSE;
     }
-    my $logtext = "";
     if (defined($temp)) {
       $logtext .= " T: $val";
     }
@@ -1920,6 +1943,7 @@ CUL_TCM97001_Parse($$)
       if ($readTrend ne $trend) {
         readingsBulkUpdate($def, "trend", $trend);
       }
+      $logtext .= " trend: $trend";
     }
     if ($hasbatcheck) {
       if (AttrVal($name, "negation-batt", 0)) {
@@ -1937,7 +1961,10 @@ CUL_TCM97001_Parse($$)
     if ($hasmode) {
       my $modeVal = ReadingsVal($name, "mode", "unknown");
       if ($mode) {
-        if ($modeVal ne  "forced") { readingsBulkUpdate($def, "mode", "forced"); }    
+        $logtext .= " mode: forced";
+        if ($modeVal ne  "forced") { 
+          readingsBulkUpdate($def, "mode", "forced");
+        }
       } else {
         if ($modeVal ne  "normal") { readingsBulkUpdate($def, "mode", "normal"); }
       }
