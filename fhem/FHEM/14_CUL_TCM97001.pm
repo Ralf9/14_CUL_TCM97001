@@ -31,7 +31,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2020-08-28 17:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2021-01-10 10:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -1319,7 +1319,7 @@ CUL_TCM97001_Parse($$)
       # PEARL NC7159, LogiLink WS0002
       #                 /--------------------------------- Sensdortype      
       #                /     / ---------------------------- ID, changes after every battery change      
-      #               /     /          /--------------------- Battery state 0 == Ok
+      #               /     /          /--------------------- Battery state 1 == Ok
       #              /     /          /  / ------------------ forced send      
       #             /     /          /  /  / ---------------- Channel (0..2)      
       #            /     /          /  /  /   / -------------- neg Temp: if 1 then temp = temp - 2048
@@ -1345,7 +1345,7 @@ CUL_TCM97001_Parse($$)
      	$model="NC_WS";
      	$channel = ((hex($a[3])) & 0x3) + 1;
      	$batbit = (hex($a[3]) & 0x8) >> 3;
-      	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+      	#$batbit = ~$batbit & 0x1; # Bat bit umdrehen
       	$mode = (hex($a[3]) & 0x4) >> 2;
      
        	if ($deviceCode ne $idType1)  # new naming convention     

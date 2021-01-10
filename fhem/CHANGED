@@ -1,0 +1,13 @@
+10.01.2021
+ - Beim Model NC_WS Battery gefixt
+28.08.2020
+ - update KW9010 and KW9015
+15.07.2020
+ - KW9015 (TFA 30.3161) zugefügt
+30.11.2019
+ - Auriol Z31743B zugefügt
+27.11.2019
+ - Es gibt nun für das Prologue Protokoll einen alternativen devicecode (DEF) bei dem als longID die 2. und 3. Ziffer verwendet wird.
+ - Der short ID support wurde vereinfacht.
+14.11.2019
+ - "TCM218943" und "Auriol_IAN" zugefügt
