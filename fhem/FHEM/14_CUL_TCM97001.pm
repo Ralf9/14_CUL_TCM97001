@@ -1,20 +1,12 @@
 # From dancer0705
 #
 # Receive temperature sensor
-# Supported models:
-#  - "TCM97..."
-#  - "ABS700"
-#  - "TCM21...."
-#  - "Prologue"
-#  - "Rubicson"
-#  - "NC_WS"
-#  - "GT_WT_02"
-#  - "AURIOL"
-#  - "KW9010"
 #
 # Unsupported models are saved in a device named CUL_TCM97001_Unknown
 #
-# Copyright (C) 2016 Bjoern Hempel
+# Copyright (C)
+# 2016 Bjoern Hempel
+# 2022 Ralf9
 #
 # This program is free software; you can redistribute it and/or modify it under 
 # the terms of the GNU General Public License as published by the Free Software 
@@ -31,7 +23,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2022-04-05 17:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 26180 2022-06-29 15:00:03Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -41,6 +33,14 @@
 # 22.10.2017 W174           rain         elektron-bbs/HomeAutoUser
 # 06.02.2018 W044  Ventus W155 Temp/Hum  pejonp
 # 06.02.2018 W132  Ventus W155 Wind/Speed/Direction  pejonp
+# 
+# 14.06.2020 update log Unkown: now in Unknow log output the verbose is also used by a renamed device unknown
+# 14.06.2020 fix Ventus W174, update log
+# 28.08.2020 add KW9015 (TFA 30.3161)
+# 10.01.2021 fix Battery at the model NC_WS
+# 05.04.2022 add Mebus HQ7312
+#            new attribute disableCreateUndefDevice: this can be used to deactivate the creation of new devices
+#            new attribute disableUnknownEvents: with this, the events can be deactivated for unknown messages
 ##############################################
 
 package main;
@@ -2167,13 +2167,18 @@ sub do_undefModelReading {
     <li>ABS700</li>
     <li>AURIOL (older Sensors with only Temperature)</li>
     <li>Auriol_IAN (NC-3982, ADE WS 1503, Tchibo 65 722)</li>
+    <li>Auriol_Z31743B</li>
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
+    <li>KW9015 (TFA 30.3161)</li>
+    <li>Mebus</li>
+    <li>Mebus7312</li>
     <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
+    <li>Type1</li>
     <li>PFR-130 (rain)</li>
     <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
@@ -2213,6 +2218,11 @@ sub do_undefModelReading {
       that a device is only received by the defined IO Device, e.g. by using
       different Frquencies (433MHz vs 868MHz)
       </li>
+    <li>disableCreateUndefDevice<br>
+         this can be used to deactivate the creation of new devices<br>
+         the new devices (Modell + ID, ioname, number) are saved in the device Unknown in the readings "undefModel_a" and "undefModel_b"</li>
+    <li>disableUnknownEvents<br>
+         with this, the events can be deactivated for unknown messages</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
@@ -2247,10 +2257,14 @@ sub do_undefModelReading {
     <li>Eurochron</li>
     <li>GT_WT_02</li>
     <li>KW9010</li>
+    <li>KW9015 (TFA 30.3161)</li>
+    <li>Mebus</li>
+    <li>Mebus7312</li>
     <li>NC_WS (PEARL NC7159)</li>
     <li>TCM21....</li>
     <li>TCM218943</li>
     <li>TCM97...</li>
+    <li>Type1</li>
     <li>PFR-130 (rain)</li>
     <li>Prologue (GT-WT-01)</li>
     <li>Rubicson</li>
@@ -2288,6 +2302,11 @@ sub do_undefModelReading {
       Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
       "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
       </li>
+    <li>disableCreateUndefDevice<br>
+         damit kann das Anlegen neuer Devices deaktiviert werden<br>
+         die neuen Devices (Modell + ID, ioname, Anzahl) werden im Device Unknown in den readings "undefModel_a" und "undefModel_b" gespeichert</li>
+    <li>disableUnknownEvents<br>
+         damit k&ouml;nnen die events bei unbekannten Nachrichten deaktiviert werden</li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
