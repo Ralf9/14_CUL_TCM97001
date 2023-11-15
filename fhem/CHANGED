@@ -1,8 +1,10 @@
+15.11.2023
+ - NX7674, Kuehl- & Gefrierschrank-Thermometer (Rosenstein & Söhne), zugefügt
+
 05.04.2022
  - Mebus HQ7312 zugefügt
  - neues Attribut disableCreateUndefDevice, damit kann das Anlegen neuer Devices deaktiviert werden
  - neues Attribut disableUnknownEvents, damit können die events bei unbekannten Nachrichten deaktiviert werden
-
 10.01.2021
  - Beim Model NC_WS Battery gefixt
 28.08.2020
