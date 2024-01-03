@@ -23,7 +23,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2022-11-15 11:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2024-01-03 17:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -88,9 +88,9 @@ CUL_TCM97001_Initialize($)
   my ($hash) = @_;
 
   $hash->{Match}     = "^s....."; 
-  $hash->{DefFn}     = "CUL_TCM97001_Define";
-  $hash->{UndefFn}   = "CUL_TCM97001_Undef";
-  $hash->{ParseFn}   = "CUL_TCM97001_Parse";
+  $hash->{DefFn}     = \&CUL_TCM97001_Define;
+  $hash->{UndefFn}   = \&CUL_TCM97001_Undef;
+  $hash->{ParseFn}   = \&CUL_TCM97001_Parse;
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:1,0 " .
                         "$readingFnAttributes " .
                         "max-deviation-temp:1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50 ".
@@ -141,6 +141,17 @@ CUL_TCM97001_Define($$)
   return "wrong syntax: define <name> CUL_TCM97001 <code>"
         if(int(@a) < 3 || int(@a) > 5);
 
+  my $dp = $modules{CUL_TCM97001}{defptr};
+  my $old = ($dp && $dp->{$a[2]} ? $dp->{$a[2]}{NAME} : "");
+  my $olddef = $hash->{OLDDEF};
+  my $op = ($hash->{OLDDEF} ? "modify":"define");
+  my $oc = ($hash->{OLDDEF} ? $hash->{CODE} : "");
+  if ($olddef) {
+    Log3 $hash, 2 , "CUL_TCM97001_Define: a2=$a[2], dp=$dp, OLDDEF=" . $olddef . ", code=" . $hash->{CODE} . ", old=$old";
+  }
+  return "Cannot $op as the code $a[2] is already used by $old" if ($old && $oc ne $a[2]);
+  delete($modules{CUL_TCM97001}{defptr}{$oc}) if($oc);
+ 
   $hash->{CODE} = $a[2];
   $hash->{lastT} =  0;
   $hash->{lastH} =  0;
