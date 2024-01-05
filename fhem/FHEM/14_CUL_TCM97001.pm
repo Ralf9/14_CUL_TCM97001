@@ -23,7 +23,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2024-01-03 17:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2024-01-05 10:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -1269,7 +1269,7 @@ CUL_TCM97001_Parse($$)
       }
     }
     
-    if (checkCRC_sduinoID33($hash,$bitData) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "NX7674")) {
+    #if (checkCRC_sduinoID33($hash,$bitData) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "NX7674")) {
        # https://forum.fhem.de/index.php?topic=135692.0
        # Rosenstein & Soehne, Kuehl- & Gefrierschrank-Thermometer
        #
@@ -1283,38 +1283,35 @@ CUL_TCM97001_Parse($$)
        # T: Temperature trend
        # x: crc4
        #
-       $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
-       $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
-       $channel = substr($bitData,2,1) eq "0" ? 2 : 1;
-       $trend = oct("0b".substr($bitData,36,2));
-       if ($trend == 1 || $trend == 2) { # falling und rising tauschen
-         $trend ^= 3;
-       }
-       $model = "NX7674";
-       
-       if ($deviceCode ne $idType1)  # new naming convention
-       {
-         if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
-         {
-           Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
-         } else {
-           $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
-         }
-       }
-       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
-       if($def) {
-         $name = $def->{NAME};
-       } else {
-         goto UNDEFINED_MODEL;
-       }
-         
-       $hasbatcheck = TRUE;
-       $haschannel = TRUE;
-       $hastrend = TRUE;
-       $packageOK = TRUE;
-       
-       $readedModel=$model;
-    }
+       # $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
+       # $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
+       # $channel = substr($bitData,2,1) eq "0" ? 2 : 1;
+       # $trend = oct("0b".substr($bitData,36,2));
+       # if ($trend == 1 || $trend == 2) { # falling und rising tauschen
+       #   $trend ^= 3;
+       # }
+       # $model = "NX7674";
+       #
+       #   if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+       #   {
+       #     Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+       #   } else {
+       #     $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+       #   }
+       # $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       #  if($def) {
+       #    $name = $def->{NAME};
+       #  } else {
+       #    goto UNDEFINED_MODEL;
+       #  }
+       #  
+       # $hasbatcheck = TRUE;
+       # $haschannel = TRUE;
+       # $hastrend = TRUE;
+       # $packageOK = TRUE;
+       #
+       # $readedModel=$model;
+    # }
     
       #Log3 $name, 4, "CUL_TCM97001: CRC for TCM21.... Failed, checking other protocolls";
       # Check for Prologue
@@ -1950,6 +1947,62 @@ CUL_TCM97001_Parse($$)
       } else {
         $name = $nameUnknown;
       }
+    }
+  } elsif (length($msg) == 14) {
+    my $hlen = length($msg);
+    my $blen = $hlen * 4;
+    my $bitData = unpack("B$blen", pack("H$hlen", $msg));
+    my $idType1 = hex($a[0] . $a[1]);
+    $deviceCode = "CUL_TCM97001_" . $idType1;
+    $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+    if($def) {
+       $name = $def->{NAME};
+    }
+    $readedModel = AttrVal($name, "model", "Unknown");
+    Log3 $iodev, 4, "$iodev: CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode, Model defined: $readedModel";
+    
+    if (checkCRC_sduinoID33($hash,$bitData) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "NX7674")) {
+       # https://forum.fhem.de/index.php?topic=135692.0
+       # Rosenstein & Soehne, Kuehl- & Gefrierschrank-Thermometer
+       #
+       # 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40
+       # 00Ii iiii | ii00 cctt | tttt tttt | tt00 0000 | 000b TTxx | xx00
+       # I: 0 - sensor 2, 1 - sensor 1
+       # i: random id (changes on power-loss)
+       # c: Channel
+       # t: Temperature
+       # b: battery indicator (0=>OK, 1=>LOW)
+       # T: Temperature trend
+       # x: crc4
+       #
+       $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
+       $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
+       $channel = substr($bitData,2,1) eq "0" ? 2 : 1;
+       $trend = oct("0b".substr($bitData,36,2));
+       if ($trend == 1 || $trend == 2) { # falling und rising tauschen
+         $trend ^= 3;
+       }
+       $model = "NX7674";
+       
+         if ( $enableLongIDs == TRUE || (($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+         {
+           Log3 $hash,4, "$iodev: CUL_TCM97001 using longid: $longids model: $model";
+         } else {
+           $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+         }
+       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+       if($def) {
+         $name = $def->{NAME};
+       } else {
+         goto UNDEFINED_MODEL;
+       }
+         
+       $hasbatcheck = TRUE;
+       $haschannel = TRUE;
+       $hastrend = TRUE;
+       $packageOK = TRUE;
+       
+       $readedModel=$model;
     }
   }
   
