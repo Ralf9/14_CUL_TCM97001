@@ -23,7 +23,7 @@
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
 #
-# $Id: 14_CUL_TCM97001.pm 18358 2024-01-05 10:00:00Z Ralf9 $
+# $Id: 14_CUL_TCM97001.pm 18358 2024-01-07 11:00:00Z Ralf9 $
 #
 #
 # 14.06.2017 W155(TCM21...) wind/rain    pejonp
@@ -1726,7 +1726,7 @@ CUL_TCM97001_Parse($$)
         $batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode = (hex($a[3]) & 0x8) >> 3;
         $trend = hex($a[3]) & 0x3;
-        $channel = (hex($a[10])) & 0x3;
+        $channel = (hex($a[9])) & 0x3;
 
         $model="Auriol_IAN";
 
@@ -1751,7 +1751,7 @@ CUL_TCM97001_Parse($$)
         $hashumidity = TRUE;
         #}
         $hasbatcheck = TRUE;
-        $haschannel = FALSE;
+        $haschannel = TRUE;
         $hasmode = TRUE;
         $hastrend = TRUE;
         $packageOK = TRUE;
@@ -1967,7 +1967,7 @@ CUL_TCM97001_Parse($$)
        #
        # 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40
        # 00Ii iiii | ii00 cctt | tttt tttt | tt00 0000 | 000b TTxx | xx00
-       # I: 0 - sensor 2, 1 - sensor 1
+       # I: 0 - sensor 1, 1 - sensor 2
        # i: random id (changes on power-loss)
        # c: Channel
        # t: Temperature
@@ -1975,9 +1975,10 @@ CUL_TCM97001_Parse($$)
        # T: Temperature trend
        # x: crc4
        #
+       # dmsg s114735400540E3 T: 15.6, Bat: ok, CH: 1
        $temp = (oct("0b". substr($bitData,22,4) . substr($bitData,18,4) . substr($bitData,14,4)) - 1220) * 5 / 90.0;
        $batbit = substr($bitData,35,1) eq "0" ? 1 : 0; 
-       $channel = substr($bitData,2,1) eq "0" ? 2 : 1;
+       $channel = substr($bitData,2,1) eq "0" ? 1 : 2;
        $trend = oct("0b".substr($bitData,36,2));
        if ($trend == 1 || $trend == 2) { # falling und rising tauschen
          $trend ^= 3;
@@ -2380,7 +2381,7 @@ sub do_undefModelReading {
 
 =begin html_DE
 
-<a name="CUL_TCM97001"></a>
+<a id="CUL_TCM97001"></a>
 <h3>CUL_TCM97001</h3>
 <ul>
   Das CUL_TCM97001 Modul verarbeitet von einem IO Ger&auml;t (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur \ Wind \ Rain - Sensoren.<br>
@@ -2411,7 +2412,7 @@ sub do_undefModelReading {
   Neu empfangene Sensoren werden in der fhem Kategory CUL_TCM97001 per autocreate angelegt.
   <br><br>
 
-  <a name="CUL_TCM97001_Define"></a>
+  <a id="CUL_TCM97001-define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
   Die ID der angelegten Sensoren sind die ersten zwei HEX Werte des empfangenen Paketes in dezimaler Schreibweise.<br>
@@ -2433,27 +2434,66 @@ sub do_undefModelReading {
    <li>windgust: Windb&ouml;e</li>
   </ul>
   <br>
+  <a id="CUL_TCM97001-attr"></a>
   <b>Attribute</b>
   <ul>
+    <a id="CUL_TCM97001-attr-IODev"></a>
     <li><a href="#IODev">IODev</a>
       Spezifiziert das physische Ger&auml;t, das die Ausstrahlung der Befehle f&uuml;r das 
       "logische" Ger&auml;t ausf&uuml;hrt. Ein Beispiel f&uuml;r ein physisches Ger&auml;t ist ein CUL.<br>
       </li>
-    <li>disableCreateUndefDevice<br>
+    <a id="CUL_TCM97001-attr-disableCreateUndefDevice"></a>
+    <li>disableCreateUndefDevice (nur beim device Unknown)<br>
          damit kann das Anlegen neuer Devices deaktiviert werden<br>
          die neuen Devices (Modell + ID, ioname, Anzahl) werden im Device Unknown in den readings "undefModel_a" und "undefModel_b" gespeichert</li>
-    <li>disableUnknownEvents<br>
+    <a id="CUL_TCM97001-attr-disableUnknownEvents"></a>
+    <li>disableUnknownEvents (nur beim device Unknown)<br>
          damit k&ouml;nnen die events bei unbekannten Nachrichten deaktiviert werden</li>
+    <a id="CUL_TCM97001-attr-do_not_notify"></a>
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <a id="CUL_TCM97001-attr-ignore"></a>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (ABS700, AURIOL, Auriol_IAN, GT_WT_02, KW9010, NC_WS, PFR-130, Prologue, Rubicson, TCM21...., TCM218943, TCM97…, Unknown, W044, W132, W174)</li>
+    <a id="CUL_TCM97001-attr-model"></a>
+    <li>model (L&auml;nge = Codel&auml;nge + 2)<br>
+    L&auml;nge = 8 (nur Temp)<br>
+    - ABS700<br>
+    - TCM97...<br>
+    L&auml;nge = 10 (nur Temp)<br>
+    - Mebus (CRC)<br>
+    - AURIOL<br>
+    - Auriol_Z31743B (Lidl Version: 09/2013), Z31743B IAN 91838 (checksum)<br>
+    L&auml;nge = 12<br>
+    - Eurochron<br>
+    - W174 (CRC)<br>
+    - TCM21.... (CRC)<br>
+    - W044 (CRC)<br>
+    - W132 (CRC)<br>
+    - GT_WT_02 (CRC)<br>
+    - Type1 (CRC)<br>
+    - Prologue (beginnt mit 9)<br>
+    - NC_WS (beginnt mit 5)<br>
+    - Rubicson (3. Stelle ist 8)<br>
+    - PFR_130 (CRC)<br>
+    - KW9010 und KW9015(CRC)<br>
+    - Auriol_IAN<br>
+    - Mebus7312 (7. Stelle ist F)<br>
+    - AURIOL nur Temp (Lidl Version: 09/2013), Z31743B IAN 91838<br>
+    - TCM218943<br>
+    L&auml;nge = 14<br>
+    - NX7674 (CRC)</li>
+    <a id="CUL_TCM97001-attr-max-deviation-temp"></a>
     <li>max-deviation-temp: (Default:1, erlaubte Werte: 1,2,3,4,5,6,7,8,9,10,15,20,25,30,35,40,45,50)<br>
          Maximal erlaubte Abweichung der gemessenen Temperatur zum vorhergehenden Wert in Kelvin.</li>
+    <a id="CUL_TCM97001-attr-max-diff-rain"></a>
     <li>max-diff-rain: Default:0 (deaktiviert)<br>
          Maximal erlaubte Abweichung der Regenmenge zum vorhergehenden Wert in l/qm.</li>
+    <a id="CUL_TCM97001-attr-negation-batt"></a>
     <li>negation-batt: Battery reading invertieren</li>
+    <a id="CUL_TCM97001-attr-showtime"></a>
     <li><a href="#showtime">showtime</a></li>
+    <a id="CUL_TCM97001-attr-readingFnAttributes"></a>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <a id="CUL_TCM97001-attr-windDirectionInverse"></a>
     <li>windDirectionInverse: Wenn der Windmesser auf dem Kopf montiert wurde, kann damit die Windrichtung herumgedreht werden.</li>
   </ul>
 
